@@ -496,7 +496,7 @@ def test_region_env_overwrite_region_config(mocker, capsys, test_datadir):
     _run_input_test_with_config(mocker, config, old_config_file, error, output, capsys, with_input=False)
 
 
-def test_no_available_no_input_no_automation_no_errors_with_config_file(mocker, capsys, test_datadir, shared_datadir):
+def test_no_available_no_input_no_automation_no_errors_with_config_file(mocker, capsys, test_datadir):
     """
     Testing easy config with user hitting return on all prompts.
 
