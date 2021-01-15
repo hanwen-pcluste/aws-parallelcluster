@@ -43,6 +43,24 @@ class Config(ABC):
         self.__validators: List[_ConfigValidator] = []
         self._validation_failures: List[ValidationResult] = []
         self.raise_on_error = raise_on_error
+        self.parent = None
+
+    def set_parent_for_nested_config(self):
+        """Execute once during initialization to set the parent of nested (children) config."""
+        for key, value in vars(self).items():
+            if isinstance(value, Config) and key != "parent":
+                value.parent = self
+                value.set_parent_for_nested_config()
+
+    def get_attribute(self, name):
+        """Get config by looking up from current config to the cluster(root) config to implement the config scoping."""
+        for key, value in vars(self).items():
+            if key == name and value:
+                return value
+        if self.parent:
+            return self.parent.get_attribute(name)
+        else:
+            return None
 
     def validate(self):
         """Execute registered validators, ordered by priority (high prio --> executed first)."""
@@ -66,7 +84,7 @@ class Config(ABC):
         """Return a human readable representation of the Configuration object."""
         return "<{name}({attributes})>".format(
             name=self.__class__.__name__,
-            attributes=",".join(f"{attr}={value}" for attr, value in self.__dict__.items()),
+            attributes=",".join(f"{attr}={value}" for attr, value in self.__dict__.items() if attr != "parent"),
         )
 
 
@@ -340,6 +358,10 @@ class HeadNodeConfig(Config):
         self.storage = storage
         self.dcv = dcv
         self._register_validator(InstanceTypeValidator, priority=1, instance_type=self.instance_type)
+
+    def get_image(self):
+        """Get image according to scoping."""
+        return self.get_attribute("image")
 
 
 class ComputeResourceConfig(Config):

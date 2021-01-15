@@ -589,7 +589,9 @@ class ClusterSchema(BaseSchema):
     @post_load
     def make_config(self, data, **kwargs):
         """Generate config object."""
-        return ClusterConfig(**data)
+        cluster_config = ClusterConfig(**data)
+        cluster_config.set_parent_for_nested_config()
+        return cluster_config
 
     '''
     @pre_load
