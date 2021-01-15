@@ -16,12 +16,14 @@
 
 import operator
 from abc import ABC
-from enum import Enum
 from typing import List
 
+from pcluster.config.extended_builtin_class import MyBool, MyInt, MyStr
+from pcluster.constants import CIDR_ALL_IPS, EBS_VOLUME_TYPE_IOPS_DEFAULT
 from pcluster.validators.common import ValidationResult, Validator
+from pcluster.validators.ebs import EbsVolumeIopsValidator, EbsVolumeThroughputValidator, EbsVolumeTypeSizeValidator
 from pcluster.validators.ec2 import InstanceTypeValidator
-from pcluster.validators.fsx import FsxS3OptionsValidator
+from pcluster.validators.fsx import FsxValidator
 
 
 class _ConfigValidator:
@@ -37,9 +39,10 @@ class _ConfigValidator:
 class Config(ABC):
     """Represent an abstract Configuration entity."""
 
-    def __init__(self):
+    def __init__(self, raise_on_error=False):
         self.__validators: List[_ConfigValidator] = []
         self._validation_failures: List[ValidationResult] = []
+        self.raise_on_error = raise_on_error
 
     def validate(self):
         """Execute registered validators, ordered by priority (high prio --> executed first)."""
@@ -49,7 +52,9 @@ class Config(ABC):
         # execute validators and add results in validation_failures array
         for attr_validator in self.__validators:
             # execute it by passing all the arguments
-            self._validation_failures.extend(attr_validator.validator_class()(**attr_validator.validator_args))
+            self._validation_failures.extend(
+                attr_validator.validator_class(raise_on_error=self.raise_on_error)(**attr_validator.validator_args)
+            )
 
         return self._validation_failures
 
@@ -65,49 +70,254 @@ class Config(ABC):
         )
 
 
-class ImageConfig(Config):
-    """Represent the configuration of an Image."""
-
-    def __init__(self, os: str, id: str = None):
-        super().__init__()
-        self.os = os
-        self.id = id
-        self._validators = []
-
-
-class HeadNodeNetworkingConfig(Config):
-    """Represent the networking configuration for the Head Node."""
+# ---------------------- Storage ---------------------- #
+class BaseEbsConfig(Config):
+    """Represent the configuration shared by EBS and RootVolume."""
 
     def __init__(
         self,
-        subnet_id: str,
-        elastic_ip: str = None,
+        volume_type: str = MyStr("gp2"),
+        iops: int = None,
+        size: int = MyInt(20),
+        encrypted: bool = MyBool(False),
+        kms_key_id: str = None,
+        throughput: int = None,
+    ):
+        super().__init__()
+        self.volume_type = volume_type
+        if iops is None:
+            if volume_type in EBS_VOLUME_TYPE_IOPS_DEFAULT:
+                iops = EBS_VOLUME_TYPE_IOPS_DEFAULT.get(volume_type)
+        self.iops = iops
+        self.size = size
+        self.encrypted = encrypted
+        self.kms_key_id = kms_key_id
+        if throughput is None and volume_type == "gp3":
+            throughput = MyInt(125)
+        self.throughput = throughput
+
+        self._register_validator(
+            EbsVolumeTypeSizeValidator, priority=10, volume_type=self.volume_type, volume_size=self.size
+        )
+        self._register_validator(
+            EbsVolumeThroughputValidator,
+            priority=1,
+            volume_type=self.volume_type,
+            volume_iops=self.iops,
+            volume_throughput=self.throughput,
+        )
+        self._register_validator(
+            EbsVolumeIopsValidator,
+            priority=1,
+            volume_type=self.volume_type,
+            volume_size=self.size,
+            volume_iops=self.iops,
+        )
+
+
+class RaidConfig(Config):
+    """Represent the Raid configuration."""
+
+    def __init__(self, type: str = None, number_of_volumes=MyInt(2)):
+        super().__init__()
+        self.type = type
+        self.number_of_volumes = number_of_volumes
+
+
+class EbsConfig(BaseEbsConfig):
+    """Represent the EBS configuration."""
+
+    def __init__(self, snapshot_id: str = None, volume_id: str = None, raid: RaidConfig = None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.snapshot_id = snapshot_id
+        self.volume_id = volume_id
+        self.raid = raid
+
+
+class EphemeralVolumeConfig(Config):
+    """Represent the Raid configuration."""
+
+    def __init__(self, encrypted: bool = MyBool(False), mount_dir: str = MyStr("/scratch")):
+        super().__init__()
+        self.encrypted = encrypted
+        self.mount_dir = mount_dir
+
+
+class StorageConfig(Config):
+    """Represent the configuration of node storage."""
+
+    def __init__(self, root_volume: BaseEbsConfig = None, ephemeral_volume: EphemeralVolumeConfig = None):
+        self.root_volume = root_volume
+        self.ephemeral_volume = ephemeral_volume
+
+
+class EfsConfig(Config):
+    """Represent the EFS configuration."""
+
+    def __init__(
+        self,
+        encrypted: bool = MyBool(False),
+        kms_key_id: str = None,
+        performance_mode: str = MyStr("generalPurpose"),
+        throughput_mode: str = MyStr("bursting"),
+        provisioned_throughput: int = None,
+        id: str = None,
+    ):
+        super().__init__()
+        self.encrypted = encrypted
+        self.kms_key_id = kms_key_id
+        self.performance_mode = performance_mode
+        self.throughput_mode = throughput_mode
+        self.provisioned_throughput = provisioned_throughput
+        self.id = id
+
+
+class FsxConfig(Config):
+    """Represent the FSX configuration."""
+
+    def __init__(
+        self,
+        storage_capacity: str = None,
+        deployment_type: str = None,
+        export_path: str = None,
+        import_path: str = None,
+        imported_file_chunk_size: str = None,
+        weekly_maintenance_start_time: str = None,
+        automatic_backup_retention_days: str = None,
+        copy_tags_to_backups: bool = None,
+        daily_automatic_backup_start_time: str = None,
+        per_unit_storage_throughput: int = None,
+        backup_id: str = None,
+        kms_key_id: str = None,
+        file_system_id: str = None,
+        auto_import_policy: str = None,
+        drive_cache_type: str = None,
+        storage_type: str = None,
+    ):
+        super().__init__()
+        self.storage_capacity = storage_capacity
+        self.storage_type = storage_type
+        self.deployment_type = deployment_type
+        self.export_path = export_path
+        self.import_path = import_path
+        self.imported_file_chunk_size = imported_file_chunk_size
+        self.weekly_maintenance_start_time = weekly_maintenance_start_time
+        self.automatic_backup_retention_days = automatic_backup_retention_days
+        self.copy_tags_to_backups = copy_tags_to_backups
+        self.daily_automatic_backup_start_time = daily_automatic_backup_start_time
+        self.per_unit_storage_throughput = per_unit_storage_throughput
+        self.backup_id = backup_id
+        self.kms_key_id = kms_key_id
+        self.file_system_id = file_system_id
+        self.auto_import_policy = auto_import_policy
+        self.drive_cache_type = drive_cache_type
+        self.storage_type = storage_type
+        self._register_validator(FsxValidator, fsx_config=self)
+        # TODO register validators
+
+
+class SharedStorageConfig(Config):
+    """Represent the Shared Storage configuration."""
+
+    def __init__(
+        self,
+        mount_dir: str,
+        ebs_settings: EbsConfig = None,
+        efs_settings: EfsConfig = None,
+        fsx_settings: FsxConfig = None,
+    ):
+        super().__init__()
+        self.mount_dir = mount_dir
+        if ebs_settings:
+            self.ebs_settings = ebs_settings
+        elif efs_settings:
+            self.efs_settings = efs_settings
+        elif fsx_settings:
+            self.fsx_settings = fsx_settings
+
+
+# ---------------------- Networking ---------------------- #
+class ProxyConfig(Config):
+    """Represent the proxy."""
+
+    def __init__(self, http_proxy_address: str = None):
+        super().__init__()
+        self.http_proxy_address = http_proxy_address
+
+
+class BaseNetworkingConfig(Config):
+    """Represent the networking configuration shared by head node and compute node."""
+
+    def __init__(
+        self,
         assign_public_ip: str = None,
         security_groups: List[str] = None,
         additional_security_groups: List[str] = None,
+        proxy: ProxyConfig = None,
     ):
         super().__init__()
-        self.subnet_id = subnet_id
-        self.elastic_ip = elastic_ip
         self.assign_public_ip = assign_public_ip
         self.security_groups = security_groups
         self.additional_security_groups = additional_security_groups
+        self.proxy = proxy
 
 
-class QueueNetworkingConfig(Config):
+class HeadNodeNetworkingConfig(BaseNetworkingConfig):
+    """Represent the networking configuration for the head node."""
+
+    def __init__(self, subnet_id: str, elastic_ip: str = None, **kwargs):
+        super().__init__(**kwargs)
+        self.subnet_id = subnet_id
+        self.elastic_ip = elastic_ip
+
+
+class PlacementGroupConfig(Config):
+    """Represent the placement group for the Queue networking."""
+
+    def __init__(self, enabled: bool = MyBool(False), id: str = None):
+        super().__init__()
+        self.enabled = enabled
+        self.id = id
+
+
+class QueueNetworkingConfig(BaseNetworkingConfig):
     """Represent the networking configuration for the Queue."""
 
-    def __init__(self, subnet_ids: List[str]):
-        super().__init__()
+    def __init__(self, subnet_ids: List[str], placement_group: PlacementGroupConfig = None, **kwargs):
+        super().__init__(**kwargs)
         self.subnet_ids = subnet_ids
+        self.placement_group = placement_group
 
 
 class SshConfig(Config):
     """Represent the SSH configuration for a node (or the entire cluster)."""
 
-    def __init__(self, key_name: str):
+    def __init__(self, key_name: str, allowed_ips: str = MyStr(CIDR_ALL_IPS)):
         super().__init__()
         self.key_name = key_name
+        self.allowed_ips = allowed_ips
+
+
+class DcvConfig(Config):
+    """Represent the DCV configuration."""
+
+    def __init__(self, enabled: bool, port: int = MyInt(8843), allowed_ips: str = MyStr(CIDR_ALL_IPS)):
+        super().__init__()
+        self.enabled = enabled
+        self.port = port
+        self.allowed_ips = allowed_ips
+
+
+# ---------------------- Nodes ---------------------- #
+class ImageConfig(Config):
+    """Represent the configuration of an Image."""
+
+    def __init__(self, os: str, custom_ami: str = None):
+        super().__init__()
+        self.os = os
+        self.custom_ami = custom_ami
+        self._validators = []
 
 
 class HeadNodeConfig(Config):
@@ -116,22 +326,26 @@ class HeadNodeConfig(Config):
     def __init__(
         self,
         instance_type: str,
-        networking_config: HeadNodeNetworkingConfig,
-        ssh_config: SshConfig,
-        image_config: ImageConfig,
+        networking: HeadNodeNetworkingConfig,
+        ssh: SshConfig,
+        image: ImageConfig = None,
+        storage: StorageConfig = None,
+        dcv: DcvConfig = None,
     ):
         super().__init__()
         self.instance_type = instance_type
-        self.image_config = image_config
-        self.networking_config = networking_config
-        self.ssh_config = ssh_config
-        self._register_validator(InstanceTypeValidator, priority=100, instance_type=self.instance_type)
+        self.image = image
+        self.networking = networking
+        self.ssh = ssh
+        self.storage = storage
+        self.dcv = dcv
+        self._register_validator(InstanceTypeValidator, priority=1, instance_type=self.instance_type)
 
 
 class ComputeResourceConfig(Config):
     """Represent the Compute Resource configuration."""
 
-    def __init__(self, instance_type: str, max_count: int = None):
+    def __init__(self, instance_type: str, max_count: int = MyInt(10)):
         super().__init__()
         self.instance_type = instance_type
         self.max_count = max_count
@@ -141,157 +355,191 @@ class ComputeResourceConfig(Config):
 class QueueConfig(Config):
     """Represent the Queue configuration."""
 
-    def __init__(
-        self, name: str, networking_config: QueueNetworkingConfig, compute_resources_config: List[ComputeResourceConfig]
-    ):
+    def __init__(self, name: str, networking: QueueNetworkingConfig, compute_resources: List[ComputeResourceConfig]):
         super().__init__()
         self.name = name
-        self.networking_config = networking_config
-        self.compute_resources_config = compute_resources_config
+        self.networking = networking
+        self.compute_resources = compute_resources
+
+
+class SchedulingSettingsConfig(Config):
+    """Represent the Scheduling configuration."""
+
+    def __init__(self, scaledown_idletime: int):
+        super().__init__()
+        self.scaledown_idletime = scaledown_idletime
 
 
 class SchedulingConfig(Config):
     """Represent the Scheduling configuration."""
 
-    def __init__(self, queues_config: List[QueueConfig], scheduler: str = "slurm"):
+    def __init__(
+        self, queues: List[QueueConfig], scheduler: str = MyStr("slurm"), settings: SchedulingSettingsConfig = None
+    ):
         super().__init__()
         self.scheduler = scheduler
-        self.queues_config = queues_config
+        self.queues = queues
+        self.settings = settings
 
 
-class SharedStorageType(Enum):
-    """Describe the Type of a shared storage."""
+# ---------------------- Monitoring ---------------------- #
+class CloudWatchLogsConfig(Config):
+    """Represent the CloudWatch configuration in Logs."""
 
-    EBS = "EBS"
-    EFS = "EFS"
-    FSX = "FSX"
-
-    @classmethod
-    def is_valid(cls, value):
-        """Verify if the given value is a valid SharedStorageType."""
-        return value in cls._member_names_
-
-
-class SharedStorageConfig(Config):
-    """Represent a generic shared storage configuration."""
-
-    def __init__(self, mount_dir: str, storage_type: SharedStorageType):
+    def __init__(
+        self,
+        enabled: bool = MyBool(True),
+        retention_in_days: int = MyInt(14),
+        log_group_id: str = None,
+        kms_key_id: str = None,
+    ):
         super().__init__()
-        self.type = storage_type
-        self.mount_dir = mount_dir
+        self.enabled = enabled
+        self.retention_in_days = retention_in_days
+        self.log_group_id = log_group_id
+        self.kms_key_id = kms_key_id
 
 
-class EbsConfig(SharedStorageConfig):
-    """Represent the EBS configuration."""
+class CloudWatchDashboardsConfig(Config):
+    """Represent the CloudWatch configuration in Dashboards."""
 
     def __init__(
         self,
-        mount_dir: str,
-        volume_type: str = None,
-        iops: int = None,
-        size: int = None,
-        encrypted: bool = None,
-        kms_key_id: str = None,
-        snapshot_id: str = None,
-        id: str = None,
+        enabled: bool = MyBool(True),
     ):
-        super().__init__(mount_dir, SharedStorageType.EBS)
-        self.volume_type = volume_type
-        self.iops = iops
-        self.size = size
-        self.encrypted = encrypted
-        self.kms_key_id = kms_key_id
-        self.snapshot_id = snapshot_id
-        self.id = id
+        super().__init__()
+        self.enabled = enabled
 
 
-class EfsConfig(SharedStorageConfig):
-    """Represent the EFS configuration."""
+class LogsConfig(Config):
+    """Represent the Logs configuration."""
 
     def __init__(
         self,
-        mount_dir: str,
-        encrypted: bool = None,
-        kms_key_id: str = None,
-        performance_mode: str = None,
-        throughput_mode: str = None,
-        provisioned_throughput: int = None,
-        id: str = None,
+        cloud_watch: CloudWatchLogsConfig = None,
     ):
-        super().__init__(mount_dir, SharedStorageType.EFS)
-        self.encrypted = encrypted
-        self.kms_key_id = kms_key_id
-        self.performance_mode = performance_mode
-        self.throughput_mode = throughput_mode
-        self.provisioned_throughput = provisioned_throughput
-        self.id = id
+        super().__init__()
+        self.cloud_watch = cloud_watch
 
 
-class FsxConfig(SharedStorageConfig):
-    """Represent the FSX configuration."""
+class DashboardsConfig(Config):
+    """Represent the Dashboards configuration."""
 
     def __init__(
         self,
-        mount_dir: str,
-        deployment_type: str = None,
-        export_path: str = None,
-        import_path: str = None,
-        imported_file_chunk_size: str = None,
-        weekly_maintenance_start_time: str = None,
-        automatic_backup_retention_days: str = None,
-        copy_tags_to_backup: bool = None,
-        daily_automatic_backup_start_time: str = None,
-        per_unit_storage_throughput: int = None,
-        backup_id: str = None,
-        kms_key_id: str = None,
-        id: str = None,
-        auto_import_policy: str = None,
-        drive_cache_type: str = None,
-        storage_type: str = None,
+        cloud_watch: CloudWatchDashboardsConfig = None,
     ):
-        super().__init__(mount_dir, SharedStorageType.FSX)
-        self.storage_type = storage_type
-        self.deployment_type = deployment_type
-        self.export_path = export_path
-        self.import_path = import_path
-        self.imported_file_chunk_size = imported_file_chunk_size
-        self.weekly_maintenance_start_time = weekly_maintenance_start_time
-        self.automatic_backup_retention_days = automatic_backup_retention_days
-        self.copy_tags_to_backup = copy_tags_to_backup
-        self.daily_automatic_backup_start_time = daily_automatic_backup_start_time
-        self.per_unit_storage_throughput = per_unit_storage_throughput
-        self.backup_id = backup_id
-        self.kms_key_id = kms_key_id
-        self.id = id
-        self.auto_import_policy = auto_import_policy
-        self.drive_cache_type = drive_cache_type
-        self.storage_type = storage_type
-        self._register_validator(
-            FsxS3OptionsValidator,
-            priority=10,
-            import_path=self.import_path,
-            export_path=self.export_path,
-            imported_file_chunk_size=self.imported_file_chunk_size,
-            auto_import_policy=self.auto_import_policy,
-        )
-        # TODO register validators
+        super().__init__()
+        self.cloud_watch = cloud_watch
 
 
+class MonitoringConfig(Config):
+    """Represent the Monitoring configuration."""
+
+    def __init__(
+        self,
+        detailed_monitoring: bool = MyBool(False),
+        logs: LogsConfig = None,
+        dashboards: DashboardsConfig = None,
+    ):
+        super().__init__()
+        self.detailed_monitoring = detailed_monitoring
+        self.logs = logs
+        self.dashboards = dashboards
+
+
+# ---------------------- Others ---------------------- #
+class RolesConfig(Config):
+    """Represent the Roles configuration."""
+
+    def __init__(
+        self,
+        head_node: str = MyStr("AUTO"),
+        compute_node: str = MyStr("AUTO"),
+        custom_lambda_resources: str = MyStr("AUTO"),
+    ):
+        super().__init__()
+        self.head_node = head_node
+        self.compute_node = compute_node
+        self.custom_lambda_resources = custom_lambda_resources
+
+
+class S3AccessConfig(Config):
+    """Represent the S3 Access configuration."""
+
+    def __init__(
+        self,
+        bucket_name: str,
+        type: str = MyStr("READ_ONLY"),
+    ):
+        super().__init__()
+        self.bucket_name = bucket_name
+        self.type = type
+
+
+class AdditionalIamPolicyConfig(Config):
+    """Represent the Additional IAM Policy configuration."""
+
+    def __init__(
+        self,
+        policy: str,
+        scope: str = MyStr("CLUSTER"),
+    ):
+        super().__init__()
+        self.policy = policy
+        self.scope = scope
+
+
+class IamConfig(Config):
+    """Represent the IAM configuration."""
+
+    def __init__(
+        self,
+        roles: RolesConfig = None,
+        s3_access: List[S3AccessConfig] = None,
+        additional_iam_policies: List[AdditionalIamPolicyConfig] = None,
+    ):
+        super().__init__()
+        self.roles = roles
+        self.s3_access = s3_access
+        self.additional_iam_policies = additional_iam_policies
+
+
+class TagConfig(Config):
+    """Represent the Tag configuration."""
+
+    def __init__(
+        self,
+        key: str = None,
+        value: str = None,
+    ):
+        super().__init__()
+        self.key = key
+        self.value = value
+
+
+# ---------------------- Root Schema ---------------------- #
 class ClusterConfig(Config):
     """Represent the full Cluster configuration."""
 
     def __init__(
         self,
-        image_config: ImageConfig,
-        head_node_config: HeadNodeConfig,
-        scheduling_config: SchedulingConfig,
-        shared_storage_list_config: List[SharedStorageConfig] = None,
+        image: ImageConfig,
+        head_node: HeadNodeConfig,
+        scheduling: SchedulingConfig,
+        shared_storage: List[SharedStorageConfig] = None,
+        monitoring: MonitoringConfig = None,
+        tags: List[TagConfig] = None,
+        iam: IamConfig = None,
     ):
         super().__init__()
-        self.image_config = image_config
-        self.head_node_config = head_node_config
-        self.scheduling_config = scheduling_config
-        self.shared_storage_list_config = shared_storage_list_config
+        self.image = image
+        self.head_node = head_node
+        self.scheduling = scheduling
+        self.shared_storage = shared_storage
+        self.monitoring = monitoring
+        self.tags = tags
+        self.iam = iam
         self.cores = None
 
     @property
