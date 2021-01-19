@@ -18,7 +18,7 @@ import operator
 from abc import ABC
 from typing import List
 
-from pcluster.config.extended_builtin_class import MyBool, MyInt, MyStr
+from pcluster.config.extended_builtin_class import MarkedBool, MarkedInt, MarkedStr
 from pcluster.constants import CIDR_ALL_IPS, EBS_VOLUME_TYPE_IOPS_DEFAULT
 from pcluster.validators.common import ValidationResult, Validator
 from pcluster.validators.ebs import EbsVolumeIopsValidator, EbsVolumeThroughputValidator, EbsVolumeTypeSizeValidator
@@ -94,24 +94,30 @@ class BaseEbsConfig(Config):
 
     def __init__(
         self,
-        volume_type: str = MyStr("gp2"),
+        volume_type: str = None,
         iops: int = None,
-        size: int = MyInt(20),
-        encrypted: bool = MyBool(False),
+        size: int = None,
+        encrypted: bool = None,
         kms_key_id: str = None,
         throughput: int = None,
     ):
         super().__init__()
-        self.volume_type = volume_type
+        if volume_type is None:
+            volume_type = MarkedStr("gp2")
         if iops is None:
             if volume_type in EBS_VOLUME_TYPE_IOPS_DEFAULT:
                 iops = EBS_VOLUME_TYPE_IOPS_DEFAULT.get(volume_type)
+        if size is None:
+            size = MarkedInt(20)
+        if encrypted is None:
+            encrypted = MarkedBool(False)
+        self.volume_type = volume_type
         self.iops = iops
         self.size = size
         self.encrypted = encrypted
         self.kms_key_id = kms_key_id
         if throughput is None and volume_type == "gp3":
-            throughput = MyInt(125)
+            throughput = MarkedInt(125)
         self.throughput = throughput
 
         self._register_validator(
@@ -136,7 +142,7 @@ class BaseEbsConfig(Config):
 class RaidConfig(Config):
     """Represent the Raid configuration."""
 
-    def __init__(self, type: str = None, number_of_volumes=MyInt(2)):
+    def __init__(self, type: str = None, number_of_volumes=MarkedInt(2)):
         super().__init__()
         self.type = type
         self.number_of_volumes = number_of_volumes
@@ -156,7 +162,7 @@ class EbsConfig(BaseEbsConfig):
 class EphemeralVolumeConfig(Config):
     """Represent the Raid configuration."""
 
-    def __init__(self, encrypted: bool = MyBool(False), mount_dir: str = MyStr("/scratch")):
+    def __init__(self, encrypted: bool = MarkedBool(False), mount_dir: str = MarkedStr("/scratch")):
         super().__init__()
         self.encrypted = encrypted
         self.mount_dir = mount_dir
@@ -175,10 +181,10 @@ class EfsConfig(Config):
 
     def __init__(
         self,
-        encrypted: bool = MyBool(False),
+        encrypted: bool = MarkedBool(False),
         kms_key_id: str = None,
-        performance_mode: str = MyStr("generalPurpose"),
-        throughput_mode: str = MyStr("bursting"),
+        performance_mode: str = MarkedStr("generalPurpose"),
+        throughput_mode: str = MarkedStr("bursting"),
         provisioned_throughput: int = None,
         id: str = None,
     ):
@@ -293,7 +299,7 @@ class HeadNodeNetworkingConfig(BaseNetworkingConfig):
 class PlacementGroupConfig(Config):
     """Represent the placement group for the Queue networking."""
 
-    def __init__(self, enabled: bool = MyBool(False), id: str = None):
+    def __init__(self, enabled: bool = MarkedBool(False), id: str = None):
         super().__init__()
         self.enabled = enabled
         self.id = id
@@ -311,7 +317,7 @@ class QueueNetworkingConfig(BaseNetworkingConfig):
 class SshConfig(Config):
     """Represent the SSH configuration for a node (or the entire cluster)."""
 
-    def __init__(self, key_name: str, allowed_ips: str = MyStr(CIDR_ALL_IPS)):
+    def __init__(self, key_name: str, allowed_ips: str = MarkedStr(CIDR_ALL_IPS)):
         super().__init__()
         self.key_name = key_name
         self.allowed_ips = allowed_ips
@@ -320,7 +326,7 @@ class SshConfig(Config):
 class DcvConfig(Config):
     """Represent the DCV configuration."""
 
-    def __init__(self, enabled: bool, port: int = MyInt(8843), allowed_ips: str = MyStr(CIDR_ALL_IPS)):
+    def __init__(self, enabled: bool, port: int = MarkedInt(8843), allowed_ips: str = MarkedStr(CIDR_ALL_IPS)):
         super().__init__()
         self.enabled = enabled
         self.port = port
@@ -367,7 +373,7 @@ class HeadNodeConfig(Config):
 class ComputeResourceConfig(Config):
     """Represent the Compute Resource configuration."""
 
-    def __init__(self, instance_type: str, max_count: int = MyInt(10)):
+    def __init__(self, instance_type: str, max_count: int = MarkedInt(10)):
         super().__init__()
         self.instance_type = instance_type
         self.max_count = max_count
@@ -396,7 +402,7 @@ class SchedulingConfig(Config):
     """Represent the Scheduling configuration."""
 
     def __init__(
-        self, queues: List[QueueConfig], scheduler: str = MyStr("slurm"), settings: SchedulingSettingsConfig = None
+        self, queues: List[QueueConfig], scheduler: str = MarkedStr("slurm"), settings: SchedulingSettingsConfig = None
     ):
         super().__init__()
         self.scheduler = scheduler
@@ -410,8 +416,8 @@ class CloudWatchLogsConfig(Config):
 
     def __init__(
         self,
-        enabled: bool = MyBool(True),
-        retention_in_days: int = MyInt(14),
+        enabled: bool = MarkedBool(True),
+        retention_in_days: int = MarkedInt(14),
         log_group_id: str = None,
         kms_key_id: str = None,
     ):
@@ -427,7 +433,7 @@ class CloudWatchDashboardsConfig(Config):
 
     def __init__(
         self,
-        enabled: bool = MyBool(True),
+        enabled: bool = MarkedBool(True),
     ):
         super().__init__()
         self.enabled = enabled
@@ -460,7 +466,7 @@ class MonitoringConfig(Config):
 
     def __init__(
         self,
-        detailed_monitoring: bool = MyBool(False),
+        detailed_monitoring: bool = MarkedBool(False),
         logs: LogsConfig = None,
         dashboards: DashboardsConfig = None,
     ):
@@ -476,9 +482,9 @@ class RolesConfig(Config):
 
     def __init__(
         self,
-        head_node: str = MyStr("AUTO"),
-        compute_node: str = MyStr("AUTO"),
-        custom_lambda_resources: str = MyStr("AUTO"),
+        head_node: str = MarkedStr("AUTO"),
+        compute_node: str = MarkedStr("AUTO"),
+        custom_lambda_resources: str = MarkedStr("AUTO"),
     ):
         super().__init__()
         self.head_node = head_node
@@ -492,7 +498,7 @@ class S3AccessConfig(Config):
     def __init__(
         self,
         bucket_name: str,
-        type: str = MyStr("READ_ONLY"),
+        type: str = MarkedStr("READ_ONLY"),
     ):
         super().__init__()
         self.bucket_name = bucket_name
@@ -505,7 +511,7 @@ class AdditionalIamPolicyConfig(Config):
     def __init__(
         self,
         policy: str,
-        scope: str = MyStr("CLUSTER"),
+        scope: str = MarkedStr("CLUSTER"),
     ):
         super().__init__()
         self.policy = policy

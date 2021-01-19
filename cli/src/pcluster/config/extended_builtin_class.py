@@ -16,7 +16,7 @@
 
 # Extend build-in classes to record if a value is implied.
 # This is useful for distinguishing values implied vs specified by a user.
-class MyInt(int):
+class MarkedInt(int):
     """Custom class to add more attributes to int."""
 
     def __new__(cls, number: int, implied: bool = True):
@@ -26,7 +26,7 @@ class MyInt(int):
         return obj
 
 
-class MyStr(str):
+class MarkedStr(str):
     """Custom class to add more attributes to str."""
 
     def __new__(cls, s: str, implied: bool = True):
@@ -36,7 +36,7 @@ class MyStr(str):
         return obj
 
 
-class MyBool(object):
+class MarkedBool(object):
     """
     Create bool object and add attributes.
 
