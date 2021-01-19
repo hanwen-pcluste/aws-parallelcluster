@@ -104,20 +104,19 @@ class BaseEbsConfig(Config):
         super().__init__()
         if volume_type is None:
             volume_type = MarkedStr("gp2")
-        if iops is None:
-            if volume_type in EBS_VOLUME_TYPE_IOPS_DEFAULT:
-                iops = EBS_VOLUME_TYPE_IOPS_DEFAULT.get(volume_type)
+        if iops is None and volume_type in EBS_VOLUME_TYPE_IOPS_DEFAULT:
+            iops = EBS_VOLUME_TYPE_IOPS_DEFAULT.get(volume_type)
         if size is None:
             size = MarkedInt(20)
         if encrypted is None:
             encrypted = MarkedBool(False)
+        if throughput is None and volume_type == "gp3":
+            throughput = MarkedInt(125)
         self.volume_type = volume_type
         self.iops = iops
         self.size = size
         self.encrypted = encrypted
         self.kms_key_id = kms_key_id
-        if throughput is None and volume_type == "gp3":
-            throughput = MarkedInt(125)
         self.throughput = throughput
 
         self._register_validator(
@@ -142,8 +141,10 @@ class BaseEbsConfig(Config):
 class RaidConfig(Config):
     """Represent the Raid configuration."""
 
-    def __init__(self, type: str = None, number_of_volumes=MarkedInt(2)):
+    def __init__(self, type: str = None, number_of_volumes=None):
         super().__init__()
+        if number_of_volumes is None:
+            number_of_volumes = MarkedInt(2)
         self.type = type
         self.number_of_volumes = number_of_volumes
 
@@ -162,8 +163,12 @@ class EbsConfig(BaseEbsConfig):
 class EphemeralVolumeConfig(Config):
     """Represent the Raid configuration."""
 
-    def __init__(self, encrypted: bool = MarkedBool(False), mount_dir: str = MarkedStr("/scratch")):
+    def __init__(self, encrypted: bool = None, mount_dir: str = None):
         super().__init__()
+        if encrypted is None:
+            encrypted = MarkedBool(False)
+        if mount_dir is None:
+            mount_dir = MarkedStr("/scratch")
         self.encrypted = encrypted
         self.mount_dir = mount_dir
 
@@ -181,14 +186,20 @@ class EfsConfig(Config):
 
     def __init__(
         self,
-        encrypted: bool = MarkedBool(False),
+        encrypted: bool = None,
         kms_key_id: str = None,
-        performance_mode: str = MarkedStr("generalPurpose"),
-        throughput_mode: str = MarkedStr("bursting"),
+        performance_mode: str = None,
+        throughput_mode: str = None,
         provisioned_throughput: int = None,
         id: str = None,
     ):
         super().__init__()
+        if encrypted is None:
+            encrypted = MarkedBool(False)
+        if performance_mode is None:
+            performance_mode = MarkedStr("generalPurpose")
+        if throughput_mode is None:
+            throughput_mode = MarkedStr("bursting")
         self.encrypted = encrypted
         self.kms_key_id = kms_key_id
         self.performance_mode = performance_mode
@@ -299,8 +310,10 @@ class HeadNodeNetworkingConfig(BaseNetworkingConfig):
 class PlacementGroupConfig(Config):
     """Represent the placement group for the Queue networking."""
 
-    def __init__(self, enabled: bool = MarkedBool(False), id: str = None):
+    def __init__(self, enabled: bool = None, id: str = None):
         super().__init__()
+        if enabled is None:
+            enabled = MarkedBool(False)
         self.enabled = enabled
         self.id = id
 
@@ -317,8 +330,10 @@ class QueueNetworkingConfig(BaseNetworkingConfig):
 class SshConfig(Config):
     """Represent the SSH configuration for a node (or the entire cluster)."""
 
-    def __init__(self, key_name: str, allowed_ips: str = MarkedStr(CIDR_ALL_IPS)):
+    def __init__(self, key_name: str, allowed_ips: str = None):
         super().__init__()
+        if allowed_ips is None:
+            allowed_ips = MarkedStr(CIDR_ALL_IPS)
         self.key_name = key_name
         self.allowed_ips = allowed_ips
 
@@ -326,8 +341,12 @@ class SshConfig(Config):
 class DcvConfig(Config):
     """Represent the DCV configuration."""
 
-    def __init__(self, enabled: bool, port: int = MarkedInt(8843), allowed_ips: str = MarkedStr(CIDR_ALL_IPS)):
+    def __init__(self, enabled: bool, port: int = None, allowed_ips: str = None):
         super().__init__()
+        if port is None:
+            port = MarkedInt(8843)
+        if allowed_ips is None:
+            allowed_ips = MarkedStr(CIDR_ALL_IPS)
         self.enabled = enabled
         self.port = port
         self.allowed_ips = allowed_ips
@@ -373,8 +392,10 @@ class HeadNodeConfig(Config):
 class ComputeResourceConfig(Config):
     """Represent the Compute Resource configuration."""
 
-    def __init__(self, instance_type: str, max_count: int = MarkedInt(10)):
+    def __init__(self, instance_type: str, max_count: int = None):
         super().__init__()
+        if max_count is None:
+            max_count = MarkedInt(10)
         self.instance_type = instance_type
         self.max_count = max_count
         # TODO add missing attributes
@@ -401,10 +422,10 @@ class SchedulingSettingsConfig(Config):
 class SchedulingConfig(Config):
     """Represent the Scheduling configuration."""
 
-    def __init__(
-        self, queues: List[QueueConfig], scheduler: str = MarkedStr("slurm"), settings: SchedulingSettingsConfig = None
-    ):
+    def __init__(self, queues: List[QueueConfig], scheduler: str = None, settings: SchedulingSettingsConfig = None):
         super().__init__()
+        if scheduler is None:
+            scheduler = MarkedStr("slurm")
         self.scheduler = scheduler
         self.queues = queues
         self.settings = settings
@@ -416,12 +437,16 @@ class CloudWatchLogsConfig(Config):
 
     def __init__(
         self,
-        enabled: bool = MarkedBool(True),
-        retention_in_days: int = MarkedInt(14),
+        enabled: bool = None,
+        retention_in_days: int = None,
         log_group_id: str = None,
         kms_key_id: str = None,
     ):
         super().__init__()
+        if enabled is None:
+            enabled = MarkedBool(True)
+        if retention_in_days is None:
+            retention_in_days = MarkedInt(14)
         self.enabled = enabled
         self.retention_in_days = retention_in_days
         self.log_group_id = log_group_id
@@ -433,9 +458,11 @@ class CloudWatchDashboardsConfig(Config):
 
     def __init__(
         self,
-        enabled: bool = MarkedBool(True),
+        enabled: bool = None,
     ):
         super().__init__()
+        if enabled is None:
+            enabled = MarkedBool(True)
         self.enabled = enabled
 
 
@@ -466,11 +493,13 @@ class MonitoringConfig(Config):
 
     def __init__(
         self,
-        detailed_monitoring: bool = MarkedBool(False),
+        detailed_monitoring: bool = None,
         logs: LogsConfig = None,
         dashboards: DashboardsConfig = None,
     ):
         super().__init__()
+        if detailed_monitoring is None:
+            detailed_monitoring = MarkedBool(False)
         self.detailed_monitoring = detailed_monitoring
         self.logs = logs
         self.dashboards = dashboards
@@ -482,11 +511,17 @@ class RolesConfig(Config):
 
     def __init__(
         self,
-        head_node: str = MarkedStr("AUTO"),
-        compute_node: str = MarkedStr("AUTO"),
-        custom_lambda_resources: str = MarkedStr("AUTO"),
+        head_node: str = None,
+        compute_node: str = None,
+        custom_lambda_resources: str = None,
     ):
         super().__init__()
+        if head_node is None:
+            head_node = MarkedStr("AUTO")
+        if compute_node is None:
+            compute_node = MarkedStr("AUTO")
+        if custom_lambda_resources is None:
+            custom_lambda_resources = MarkedStr("AUTO")
         self.head_node = head_node
         self.compute_node = compute_node
         self.custom_lambda_resources = custom_lambda_resources
@@ -498,9 +533,11 @@ class S3AccessConfig(Config):
     def __init__(
         self,
         bucket_name: str,
-        type: str = MarkedStr("READ_ONLY"),
+        type: str = None,
     ):
         super().__init__()
+        if type is None:
+            type = MarkedStr("READ_ONLY")
         self.bucket_name = bucket_name
         self.type = type
 
@@ -511,9 +548,11 @@ class AdditionalIamPolicyConfig(Config):
     def __init__(
         self,
         policy: str,
-        scope: str = MarkedStr("CLUSTER"),
+        scope: str = None,
     ):
         super().__init__()
+        if scope is None:
+            scope = MarkedStr("CLUSTER")
         self.policy = policy
         self.scope = scope
 
