@@ -712,6 +712,7 @@ class BaseCluster(Resource):
         self.cluster_s3_bucket = Resource.init_param(cluster_s3_bucket)
         self.additional_resources = Resource.init_param(additional_resources)
         self.dev_settings = dev_settings
+        self.build_symbol_table({})
 
     def _register_validators(self):
         self._add_validator(

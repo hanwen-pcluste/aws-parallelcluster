@@ -34,6 +34,23 @@ class _ResourceValidator(ABC):
 class Resource(ABC):
     """Represent an abstract Resource entity."""
 
+    symbol_table = {}
+
+    def build_symbol_table(self, parent_symbol_table):
+        for key, value in vars(self).items():
+            self.symbol_table[key] = value
+        for key, value in vars(self).items():
+            self._build_symbol_table(key,value)
+
+    def _build_symbol_table(self, key, value):
+        if isinstance(key, Resource):
+            symbol_table_cppy = self.symbol_table.copy()
+            del symbol_table_cppy[key]  # Prevent self reference
+            value.build_symbol_table(symbol_table_cppy)
+        elif isinstance(value, List):
+            for element in value:
+                self._build_symbol_table(key, element)
+
     class Param:
         """
         Represent a Configuration-managed attribute of a Resource.
