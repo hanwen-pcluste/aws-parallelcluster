@@ -16,6 +16,10 @@ import time
 
 import boto3
 import configparser
+
+import yaml
+
+from pcluster.schemas.cluster_schema import ClusterSchema
 from retrying import retry
 from utils import retrieve_cfn_outputs, retrieve_cfn_resources, retry_if_subprocess_error, run_command
 
@@ -27,8 +31,9 @@ class Cluster:
         self.name = name
         self.config_file = config_file
         self.ssh_key = ssh_key
-        self.config = configparser.ConfigParser()
-        self.config.read(config_file)
+        with open(config_file) as conf_file:
+            yaml_content = yaml.load(conf_file, Loader=yaml.SafeLoader)
+        self.config = ClusterSchema().load(yaml_content)
         self.has_been_deleted = False
         self.create_complete = False
         self.__cfn_outputs = None
@@ -154,17 +159,12 @@ class Cluster:
         return "parallelcluster-" + self.name
 
     @property
-    def region(self):
-        """Return the aws region the cluster is created in."""
-        return self.config.get("aws", "aws_region_name", fallback="us-east-1")
-
-    @property
     def head_node_ip(self):
         """Return the public ip of the cluster head node."""
         if "MasterPublicIP" in self.cfn_outputs:
             return self.cfn_outputs["MasterPublicIP"]
         else:
-            ec2 = boto3.client("ec2", region_name=self.region)
+            ec2 = boto3.client("ec2")
             filters = [
                 {"Name": "tag:Application", "Values": [self.cfn_name]},
                 {"Name": "instance-state-name", "Values": ["running"]},
@@ -191,7 +191,7 @@ class Cluster:
         Outputs are retrieved only once and then cached.
         """
         if not self.__cfn_outputs:
-            self.__cfn_outputs = retrieve_cfn_outputs(self.cfn_name, self.region)
+            self.__cfn_outputs = retrieve_cfn_outputs(self.cfn_name)
         return self.__cfn_outputs
 
     @property
@@ -201,7 +201,7 @@ class Cluster:
         Resources are retrieved only once and then cached.
         """
         if not self.__cfn_resources:
-            self.__cfn_resources = retrieve_cfn_resources(self.cfn_name, self.region)
+            self.__cfn_resources = retrieve_cfn_resources(self.cfn_name)
         return self.__cfn_resources
 
     @property
@@ -212,7 +212,7 @@ class Cluster:
         """
         if not self.__head_node_substack_cfn_resources:
             self.__head_node_substack_cfn_resources = retrieve_cfn_resources(
-                self.cfn_resources.get("MasterServerSubstack"), self.region
+                self.cfn_resources.get("MasterServerSubstack")
             )
         return self.__head_node_substack_cfn_resources
 
@@ -224,7 +224,7 @@ class Cluster:
         """
         if not self.__ebs_substack_cfn_resources:
             self.__ebs_substack_cfn_resources = retrieve_cfn_resources(
-                self.cfn_resources.get("EBSCfnStack"), self.region
+                self.cfn_resources.get("EBSCfnStack")
             )
         return self.__ebs_substack_cfn_resources
 

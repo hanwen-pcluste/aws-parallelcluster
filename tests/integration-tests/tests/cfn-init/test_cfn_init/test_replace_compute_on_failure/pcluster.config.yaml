@@ -1,0 +1,27 @@
+Image:
+  Os: {{ os }}
+HeadNode:
+  InstanceType: {{ instance }}
+  Networking:
+    SubnetId: {{ public_subnet_id }}
+  Ssh:
+    KeyName: {{ key_name }}
+  DisableSimultaneousMultithreading: false
+  CustomActions:
+    - Script: s3://{{ bucket_name }}/post_install.sh
+Scheduling:
+  Slurm: # Fixme: retrieve from {{ scheduler }}, but we need to make it camelcased
+    Settings:
+      ScaledownIdletime: 10
+    Queues:
+      - Name: queue-0
+        CustomActions:
+          - Script: s3://{{ bucket_name }}/post_install.sh
+        ComputeResources:
+          - Name: compute-resource-0
+            InstanceType: {{ instance }}
+            MinCount: 10
+            DisableSimultaneousMultithreading: false
+        Networking:
+          SubnetIds:
+            - {{ public_subnet_id }}

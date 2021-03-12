@@ -35,7 +35,7 @@ class CfnStack:
         Outputs are retrieved only once and then cached.
         """
         if not self.__cfn_outputs:
-            self.__cfn_outputs = retrieve_cfn_outputs(self.name, self.region)
+            self.__cfn_outputs = retrieve_cfn_outputs(self.name)
         return self.__cfn_outputs
 
     @property

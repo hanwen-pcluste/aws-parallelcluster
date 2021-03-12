@@ -71,11 +71,11 @@ def random_alphanumeric(size=16):
 
 
 @retry(wait_exponential_multiplier=500, wait_exponential_max=5000, stop_max_attempt_number=5)
-def retrieve_cfn_outputs(stack_name, region):
+def retrieve_cfn_outputs(stack_name):
     """Retrieve CloudFormation Stack Outputs from a given stack."""
     logging.debug("Retrieving stack outputs for stack {}".format(stack_name))
     try:
-        cfn = boto3.client("cloudformation", region_name=region)
+        cfn = boto3.client("cloudformation")
         stack = cfn.describe_stacks(StackName=stack_name).get("Stacks")[0]
         outputs = {}
         for output in stack.get("Outputs", []):
@@ -87,23 +87,21 @@ def retrieve_cfn_outputs(stack_name, region):
 
 
 @retry(wait_exponential_multiplier=500, wait_exponential_max=5000, stop_max_attempt_number=5)
-def get_cfn_resources(stack_name, region=None):
+def get_cfn_resources(stack_name):
     """Return the results of calling list_stack_resources for the given stack."""
-    if region is None:
-        region = os.environ.get("AWS_DEFAULT_REGION")
     try:
         logging.debug("Retrieving stack resources for stack {}".format(stack_name))
-        cfn = boto3.client("cloudformation", region_name=region)
+        cfn = boto3.client("cloudformation")
         return cfn.list_stack_resources(StackName=stack_name).get("StackResourceSummaries")
     except Exception as e:
         logging.warning("Failed retrieving stack resources for stack {} with exception: {}".format(stack_name, e))
         raise
 
 
-def retrieve_cfn_resources(stack_name, region):
+def retrieve_cfn_resources(stack_name):
     """Retrieve CloudFormation Stack Resources from a given stack."""
     resources = {}
-    for resource in get_cfn_resources(stack_name, region):
+    for resource in get_cfn_resources(stack_name):
         resources[resource.get("LogicalResourceId")] = resource.get("PhysicalResourceId")
     return resources
 
@@ -326,6 +324,8 @@ def paginate_boto3(method, **kwargs):
 def get_vpc_snakecase_value(vpc_stack):
     """Return dict containing snakecase vpc variables."""
     vpc_output_dict = {}
+    logging.info("vpc_stack")
+    logging.info(vpc_stack)
     for key, value in vpc_stack.cfn_outputs.items():
         vpc_output_dict[to_snake_case(key)] = value
     return vpc_output_dict
