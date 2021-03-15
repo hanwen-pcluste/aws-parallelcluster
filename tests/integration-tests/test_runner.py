@@ -63,7 +63,7 @@ TEST_DEFAULTS = {
     "post_install": None,
     "vpc_stack": None,
     "cluster": None,
-    "no_delete": False,
+    "no_delete": True,
     "benchmarks": False,
     "benchmarks_target_capacity": 200,
     "benchmarks_max_time": 30,
