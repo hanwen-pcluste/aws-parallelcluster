@@ -63,14 +63,17 @@ def test_iam_roles(
     # Check all CloudFormation stacks after creation
     # If scheduler is awsbatch, there will still be IAM roles created.
     _check_lambda_role(cfn_client, lambda_client, main_stack_name, lambda_role_name, not is_awsbatch)
+    _check_cluster_role(region, cfn_client, main_stack_name, cluster_role_name)
 
-    # Test updating the iam_lambda_role
+    # Test updating the roles
+    updated_cluster_role_name = role_factory("ec2", [instance_policies])
     updated_lambda_role_name = role_factory("lambda", [lambda_policies])
+    assert_that(updated_cluster_role_name == cluster_role_name).is_false()
     assert_that(updated_lambda_role_name == lambda_role_name).is_false()
     cluster.config_file = str(
         pcluster_config_reader(
             config_file=updated_config_file_name,
-            ec2_iam_role=cluster_role_name,
+            ec2_iam_role=updated_cluster_role_name,
             iam_lambda_role=updated_lambda_role_name,
         )
     )
@@ -78,6 +81,29 @@ def test_iam_roles(
 
     # Check all CloudFormation stacks after update
     _check_lambda_role(cfn_client, lambda_client, main_stack_name, updated_lambda_role_name, not is_awsbatch)
+    _check_cluster_role(region, cfn_client, main_stack_name, updated_cluster_role_name)
+
+def _check_cluster_role(region, cfn_client, stack_name, cluster_role_name):
+    instance_profile_id = cfn_client.describe_stack_resource(
+        StackName=stack_name, LogicalResourceId="RootInstanceProfile"
+    )["StackResourceDetail"]["PhysicalResourceId"]
+    iam_client = boto3.client("iam", region_name=region)
+    instance_profile_role_name = iam_client.get_instance_profile(InstanceProfileName=instance_profile_id)["InstanceProfile"]["Roles"][0]["RoleName"]
+    assert_that(instance_profile_role_name).is_equal_to(cluster_role_name)
+    head_node_substack_id = cfn_client.describe_stack_resource(
+        StackName=stack_name, LogicalResourceId="MasterServerSubstack"
+    )["StackResourceDetail"]["PhysicalResourceId"]
+    head_node_substack_parameters = cfn_client.describe_stacks(StackName=head_node_substack_id)["Stacks"][0]["Parameters"]
+    for param in head_node_substack_parameters:
+        if param["ParameterKey"] == "IamRoleName":
+            assert_that(param["ParameterValue"]).is_equal_to(cluster_role_name)
+    compute_substack_id = cfn_client.describe_stack_resource(
+        StackName=stack_name, LogicalResourceId="ComputeFleetSubstack"
+    )["StackResourceDetail"]["PhysicalResourceId"]
+    compute_substack_parameters = cfn_client.describe_stacks(StackName=compute_substack_id)["Stacks"][0]["Parameters"]
+    for param in compute_substack_parameters:
+        if param["ParameterKey"] == "IamRoleName":
+            assert_that(param["ParameterValue"]).is_equal_to(cluster_role_name)
 
 
 def _check_lambda_role(cfn_client, lambda_client, stack_name, lambda_role_name, check_no_role_is_created):
