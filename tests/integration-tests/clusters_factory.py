@@ -122,7 +122,7 @@ class Cluster:
 
     def instances(self, desired_instance_role=None):
         """Run pcluster stop and return the result."""
-        if desired_instance_role and desired_instance_role not in ("MasterServer", "ComputeFleet"):
+        if desired_instance_role and desired_instance_role not in ("HeadNode", "ComputeFleet"):
             raise ValueError
         cmd_args = ["pcluster", "instances", "--config", self.config_file, self.name]
         try:
@@ -148,14 +148,14 @@ class Cluster:
     @property
     def head_node_ip(self):
         """Return the public ip of the cluster head node."""
-        if "MasterPublicIP" in self.cfn_outputs:
-            return self.cfn_outputs["MasterPublicIP"]
+        if "HeadNodePublicIP" in self.cfn_outputs:
+            return self.cfn_outputs["HeadNodePublicIP"]
         else:
             ec2 = boto3.client("ec2")
             filters = [
                 {"Name": "tag:Application", "Values": [self.cfn_name]},
                 {"Name": "instance-state-name", "Values": ["running"]},
-                {"Name": "tag:Name", "Values": ["Master"]},
+                {"Name": "tag:Name", "Values": ["HeadNode"]},
             ]
             instance = ec2.describe_instances(Filters=filters).get("Reservations")[0].get("Instances")[0]
             return instance.get("PublicIpAddress")
