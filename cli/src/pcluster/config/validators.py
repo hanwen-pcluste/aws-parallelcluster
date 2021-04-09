@@ -90,7 +90,7 @@ FSX_MESSAGES = {
 
 FSX_SUPPORTED_ARCHITECTURES_OSES = {
     "x86_64": SUPPORTED_OSS,
-    "arm64": ["ubuntu1804", "alinux2", "centos8"],
+    "arm64": ["ubuntu1804", "ubuntu2004", "alinux2", "centos8"],
 }
 
 FSX_PARAM_WITH_DEFAULT = {"drive_cache_type": "NONE"}
@@ -698,7 +698,7 @@ def url_validator(param_key, param_value, pcluster_config):
 
     else:
         try:
-            urllib.request.urlopen(param_value)
+            urllib.request.urlopen(param_value)  # nosec nosemgrep
         except urllib.error.HTTPError as e:
             warnings.append("{0} {1} {2}".format(param_value, e.code, e.reason))
         except urllib.error.URLError as e:
