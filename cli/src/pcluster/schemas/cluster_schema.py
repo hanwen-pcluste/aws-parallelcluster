@@ -35,11 +35,11 @@ from pcluster.models.cluster_config import (
     AdditionalIamPolicy,
     AdditionalPackages,
     AmiSearchFilters,
-    AwsbatchClusterConfig,
-    AwsbatchComputeResource,
-    AwsbatchQueue,
-    AwsbatchScheduling,
-    AwsbatchSettings,
+    AwsBatchClusterConfig,
+    AwsBatchComputeResource,
+    AwsBatchQueue,
+    AwsBatchScheduling,
+    AwsBatchSettings,
     BaseClusterConfig,
     CapacityType,
     CloudWatchDashboards,
@@ -532,7 +532,7 @@ class QueueNetworkingSchema(BaseNetworkingSchema):
     subnet_ids = fields.List(
         fields.Str(validate=get_field_validator("subnet_id")),
         required=True,
-        validate=validate.Length(equal=1),  # FIXME Add multi-subnet support for Awsbatch
+        validate=validate.Length(equal=1),  # FIXME Add multi-subnet support for AwsBatch
         metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP},
     )
     placement_group = fields.Nested(PlacementGroupSchema, metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP})
@@ -879,7 +879,7 @@ class SlurmComputeResourceSchema(_ComputeResourceSchema):
         return SlurmComputeResource(**data)
 
 
-class AwsbatchComputeResourceSchema(_ComputeResourceSchema):
+class AwsBatchComputeResourceSchema(_ComputeResourceSchema):
     """Represent the schema of the Batch ComputeResource."""
 
     instance_types = fields.Str(required=True, metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP})
@@ -901,7 +901,7 @@ class AwsbatchComputeResourceSchema(_ComputeResourceSchema):
     @post_load
     def make_resource(self, data, **kwargs):
         """Generate resource."""
-        return AwsbatchComputeResource(**data)
+        return AwsBatchComputeResource(**data)
 
 
 class ComputeSettingsSchema(BaseSchema):
@@ -949,11 +949,11 @@ class SlurmQueueSchema(BaseQueueSchema):
         return SlurmQueue(**data)
 
 
-class AwsbatchQueueSchema(BaseQueueSchema):
+class AwsBatchQueueSchema(BaseQueueSchema):
     """Represent the schema of a Batch Queue."""
 
     compute_resources = fields.Nested(
-        AwsbatchComputeResourceSchema,
+        AwsBatchComputeResourceSchema,
         many=True,
         validate=validate.Length(equal=1),
         metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP, "update_key": "Name"},
@@ -962,7 +962,7 @@ class AwsbatchQueueSchema(BaseQueueSchema):
     @post_load
     def make_resource(self, data, **kwargs):
         """Generate resource."""
-        return AwsbatchQueue(**data)
+        return AwsBatchQueue(**data)
 
 
 class DnsSchema(BaseSchema):
@@ -1000,33 +1000,33 @@ class SlurmSchema(BaseSchema):
     )
 
 
-class AwsbatchSettingsSchema(BaseSchema):
-    """Represent the schema of the Awsbatch Scheduling Settings."""
+class AwsBatchSettingsSchema(BaseSchema):
+    """Represent the schema of the AwsBatch Scheduling Settings."""
 
     @post_load
     def make_resource(self, data, **kwargs):
         """Generate resource."""
-        return AwsbatchSettings(**data)
+        return AwsBatchSettings(**data)
 
 
-class AwsbatchSchema(BaseSchema):
-    """Represent the schema of the Awsbatch section."""
+class AwsBatchSchema(BaseSchema):
+    """Represent the schema of the AwsBatch section."""
 
     queues = fields.Nested(
-        AwsbatchQueueSchema,
+        AwsBatchQueueSchema,
         many=True,
         required=True,
         validate=validate.Length(equal=1),
         metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP, "update_key": "Name"},
     )
-    settings = fields.Nested(AwsbatchSettingsSchema, metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP})
+    settings = fields.Nested(AwsBatchSettingsSchema, metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP})
 
 
 class SchedulingSchema(BaseSchema):
     """Represent the schema of the Scheduling."""
 
     slurm = fields.Nested(SlurmSchema, metadata={"update_policy": UpdatePolicy.SUPPORTED})
-    awsbatch = fields.Nested(AwsbatchSchema, metadata={"update_policy": UpdatePolicy.SUPPORTED})
+    aws_batch = fields.Nested(AwsBatchSchema, metadata={"update_policy": UpdatePolicy.SUPPORTED})
     scheduler = fields.Str(
         required=True,
         validate=validate.OneOf(["slurm", "awsbatch", "custom"]),
@@ -1036,11 +1036,11 @@ class SchedulingSchema(BaseSchema):
 
     @pre_load
     def preprocess(self, data, **kwargs):
-        """Before load the data into schema, change the settings to adapt different storage types."""
+        """Before load the data into schema, change the settings to adapt different scheduling settings."""
         if data.get("Scheduler") == "slurm":
             scheduler, scheduler_settings = "Slurm", "SlurmSettings"
         elif data.get("Scheduler") == "awsbatch":
-            scheduler, scheduler_settings = "Awsbatch", "AwsbatchSettings"
+            scheduler, scheduler_settings = "AwsBatch", "AwsBatchSettings"
         # elif data.get("Scheduler") == "custom":
         #     scheduler, scheduler_settings = "Custom", "CustomSettings"
         else:
@@ -1057,11 +1057,11 @@ class SchedulingSchema(BaseSchema):
 
     @post_load
     def make_resource(self, data, **kwargs):
-        """Generate the right type of scheduling according to the child type (Slurm vs Awsbatch vs Custom)."""
+        """Generate the right type of scheduling according to the child type (Slurm vs AwsBatch vs Custom)."""
         if data.get("slurm"):
             return SlurmScheduling(**data.get("slurm"))
-        if data.get("awsbatch"):
-            return AwsbatchScheduling(**data.get("awsbatch"))
+        if data.get("aws_batch"):
+            return AwsBatchScheduling(**data.get("aws_batch"))
         # if data.get("custom_scheduling"):
         #    return CustomScheduling(data.get("scheduler"), **data.get("custom_scheduling"))
         return None
@@ -1069,21 +1069,22 @@ class SchedulingSchema(BaseSchema):
     @pre_dump
     def restore_child(self, data, **kwargs):
         """Restore back the child in the schema."""
-        setattr(data, data.scheduler, data)
+        attribute_name = "aws_batch" if data.scheduler == "awsbatch" else data.scheduler
+        setattr(data, attribute_name, data)
         return data
 
     @post_dump
     def post_processed(self, data, **kwargs):
         """Restore the SharedStorage Schema back to its origin."""
         if data.get("Slurm"):
-            scheduler, schedulersettings = "Slurm", "SlurmSettings"
-        elif data.get("Awsbatch"):
-            scheduler, schedulersettings = "Awsbatch", "AwsbatchSettings"
+            scheduler, scheduler_settings = "Slurm", "SlurmSettings"
+        elif data.get("AwsBatch"):
+            scheduler, scheduler_settings = "AwsBatch", "AwsBatchSettings"
         # elif data.get("Scheduler") == "custom":
         #     scheduler, scheduler_settings = "Custom", "CustomSettings"
 
         if data.get(scheduler).get("Settings"):
-            data[schedulersettings] = data[scheduler].pop("Settings")
+            data[scheduler_settings] = data[scheduler].pop("Settings")
         else:
             data[scheduler].pop("Settings")
 
@@ -1125,7 +1126,7 @@ class ClusterSchema(BaseSchema):
         if scheduler == "slurm":
             cluster = SlurmClusterConfig(**data)
         elif scheduler == "awsbatch":
-            cluster = AwsbatchClusterConfig(**data)
+            cluster = AwsBatchClusterConfig(**data)
         else:  # scheduler == "custom":
             cluster = BaseClusterConfig(**data)  # FIXME Must be ByosCluster
 
