@@ -17,6 +17,7 @@ import subprocess as sp
 import boto3
 import pytest
 from assertpy import assert_that
+from constants import OS_TO_ROOT_VOLUME_DEVICE
 
 
 @pytest.mark.regions(["ap-southeast-1"])
@@ -146,14 +147,6 @@ def get_ec2_instance_tags(instance_id, region):
 def get_root_volume_id(instance_id, region, os):
     """Return the root EBS volume's ID for the given EC2 instance."""
     logging.info("Getting root volume for instance %s", instance_id)
-    os_to_root_volume_device = {
-        # These are taken from the main CFN template
-        "centos7": "/dev/sda1",
-        "centos8": "/dev/sda1",
-        "alinux2": "/dev/xvda",
-        "ubuntu1804": "/dev/sda1",
-        "ubuntu2004": "/dev/sda1",
-    }
     block_device_mappings = (
         boto3.client("ec2", region_name=region)
         .describe_instances(InstanceIds=[instance_id])
@@ -164,7 +157,7 @@ def get_root_volume_id(instance_id, region, os):
     matching_devices = [
         device_mapping
         for device_mapping in block_device_mappings
-        if device_mapping.get("DeviceName") == os_to_root_volume_device[os]
+        if device_mapping.get("DeviceName") == OS_TO_ROOT_VOLUME_DEVICE[os]
     ]
     assert_that(matching_devices).is_length(1)
     return matching_devices[0].get("Ebs").get("VolumeId")

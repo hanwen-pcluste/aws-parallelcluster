@@ -116,7 +116,7 @@ class Ebs(Resource):
     ):
         super().__init__()
         self.size = Resource.init_param(size, default=EBS_VOLUME_SIZE_DEFAULT)
-        self.encrypted = Resource.init_param(encrypted, default=False)
+        self.encrypted = Resource.init_param(encrypted, default=True)
 
 
 class Raid(Resource):
@@ -815,7 +815,6 @@ class BaseQueue(Resource):
         self,
         name: str,
         networking: QueueNetworking,
-        compute_settings: ComputeSettings = None,
         capacity_type: str = None,
         iam: Iam = None,
     ):
@@ -824,7 +823,6 @@ class BaseQueue(Resource):
         self.networking = networking
         _capacity_type = CapacityType[capacity_type.upper()] if capacity_type else None
         self.capacity_type = Resource.init_param(_capacity_type, default=CapacityType.ONDEMAND)
-        self.compute_settings = compute_settings
         self.iam = iam or Iam(implied=True)
 
     def _validate(self):
@@ -1271,9 +1269,10 @@ class SlurmComputeResource(BaseComputeResource):
 class SlurmQueue(BaseQueue):
     """Represent the Slurm Queue resource."""
 
-    def __init__(self, compute_resources: List[SlurmComputeResource], custom_actions: CustomActions = None, **kwargs):
+    def __init__(self, compute_resources: List[SlurmComputeResource], compute_settings: ComputeSettings = None, custom_actions: CustomActions = None, **kwargs):
         super().__init__(**kwargs)
         self.compute_resources = compute_resources
+        self.compute_settings = compute_settings
         self.custom_actions = custom_actions
 
     def _validate(self):

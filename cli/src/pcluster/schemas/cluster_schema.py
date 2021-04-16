@@ -922,7 +922,6 @@ class BaseQueueSchema(BaseSchema):
     """Represent the schema of the attributes in common between all the schedulers queues."""
 
     name = fields.Str(metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
-    compute_settings = fields.Nested(ComputeSettingsSchema, metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP})
     networking = fields.Nested(
         QueueNetworkingSchema, required=True, metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP}
     )
@@ -936,6 +935,7 @@ class BaseQueueSchema(BaseSchema):
 class SlurmQueueSchema(BaseQueueSchema):
     """Represent the schema of a Slurm Queue."""
 
+    compute_settings = fields.Nested(ComputeSettingsSchema, metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP})
     compute_resources = fields.Nested(
         SlurmComputeResourceSchema,
         many=True,
