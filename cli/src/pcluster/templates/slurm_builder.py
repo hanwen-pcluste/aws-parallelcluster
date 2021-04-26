@@ -127,12 +127,30 @@ class SlurmConstruct(Construct):
                         conditions={"StringEquals": {"ec2:ResourceTag/Application": self.stack_name}},
                     ),
                     iam.PolicyStatement(
+                        sid="EC2RunInstances",
+                        effect=iam.Effect.ALLOW,
+                        actions=["ec2:RunInstances"],
+                        resources=[
+                            self._format_arn(service="ec2", resource=f"subnet/{subnet_id}")
+                            for subnet_id in self.config.compute_subnet_ids
+                        ]
+                        + [
+                            self._format_arn(service="ec2", resource="network-interface/*"),
+                            self._format_arn(service="ec2", resource="instance/*"),
+                            self._format_arn(service="ec2", resource="volume/*"),
+                            self._format_arn(service="ec2", resource="image/ami-*", account=""),
+                            self._format_arn(service="ec2", resource="key-pair/*"),
+                            self._format_arn(service="ec2", resource="security-group/*"),
+                            self._format_arn(service="ec2", resource="launch-template/*"),
+                            self._format_arn(service="ec2", resource="placement-group/*"),
+                        ],
+                    ),
+                    iam.PolicyStatement(
                         sid="EC2",
                         effect=iam.Effect.ALLOW,
                         actions=[
                             "ec2:DescribeInstances",
                             "ec2:DescribeLaunchTemplates",
-                            "ec2:RunInstances",
                             "ec2:DescribeInstanceStatus",
                             "ec2:CreateTags",
                         ],
