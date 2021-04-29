@@ -39,14 +39,14 @@ Scheduling:
             - DEF
       CapacityType: SPOT
       ComputeResources:
-        - Name: compute-resource-11
+        - Name: queue1-i1
           InstanceType: c5.xlarge
           MinCount: 2
           MaxCount: 4
-        - Name: compute-resource-12
+        - Name: queue1-i2
           InstanceType: c5.2xlarge
           SpotPrice: 2.1
-        - Name: compute-resource-13
+        - Name: queue1-i3
           InstanceType: t2.micro
       Iam:
         S3Access:
@@ -78,7 +78,7 @@ Scheduling:
           Args:
             - DEF
       ComputeResources:
-        - Name: compute-resource-21
+        - Name: queue2-i1
           InstanceType: c5n.18xlarge
           MaxCount: 1
           DisableSimultaneousMultithreading: true
@@ -135,7 +135,7 @@ SharedStorage:
       ProvisionedThroughput: 1024
   - MountDir: raid
     StorageType: Ebs
-    Name: raid-type1
+    Name: raid
     EbsSettings:
       Iops: 110
       Raid:
@@ -153,3 +153,7 @@ Monitoring:
     CloudWatch:
       Enabled: true
       RetentionInDays: 1
+DevSettings:
+  Cookbook:
+    ExtraChefAttributes: |
+      {"test_key" : "test_value_2"}
