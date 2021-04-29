@@ -12,15 +12,6 @@ HeadNode:
     SubnetId: {{ public_subnet_id }}
   Ssh:
     KeyName: {{ key_name }}
-  CustomActions:
-    OnNodeStart:
-      Script: s3://{{ bucket }}/scripts/preinstall.sh
-      Args:
-        - ABC
-    OnNodeConfigured:
-      Script: s3://{{ bucket }}/scripts/postinstall.sh
-      Args:
-        - DEF
   Iam:
     S3Access:
       - BucketName: {{ resource_bucket }}
