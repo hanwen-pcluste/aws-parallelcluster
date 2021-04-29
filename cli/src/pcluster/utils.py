@@ -22,6 +22,7 @@ import urllib.request
 import zipfile
 from io import BytesIO
 from shlex import quote
+from typing import NoReturn
 from urllib.parse import urlparse
 
 import boto3
@@ -290,12 +291,9 @@ def warn(message):
     print("WARNING: {0}".format(message))
 
 
-def error(message, fail_on_error=True):
-    """Print an error message and Raise SystemExit exception to the stderr if fail_on_error is true."""
-    if fail_on_error:
-        sys.exit("ERROR: {0}".format(message))
-    else:
-        print("ERROR: {0}".format(message))
+def error(message) -> NoReturn:
+    """Raise SystemExit exception to the stderr."""
+    sys.exit("ERROR: {0}".format(message))
 
 
 def get_cli_log_file():

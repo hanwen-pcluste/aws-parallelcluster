@@ -3,7 +3,7 @@
 # flake8: noqa
 
 import json
-import logging as logging
+import logging
 import time
 from http.client import HTTPSConnection
 from urllib.parse import urlsplit, urlunsplit

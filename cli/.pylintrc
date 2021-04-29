@@ -158,6 +158,8 @@ disable=print-statement,
         no-self-use,
         no-member,
         unused-import, # handled by flake8
+        no-else-return, # A complete if else block can improve readability even with returns in the body
+        invalid-name, # This would prevent us from using single letter variable
 
 
 # Enable the message, report, category or checker with the given id(s). You can
@@ -195,7 +197,7 @@ score=yes
 [REFACTORING]
 
 # Maximum number of nested blocks for function / method body
-max-nested-blocks=5
+max-nested-blocks=6
 
 # Complete name of functions that never returns. When checking for
 # inconsistent-return-statements if a never returning function is called then

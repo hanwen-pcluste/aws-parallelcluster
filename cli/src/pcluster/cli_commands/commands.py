@@ -161,13 +161,13 @@ def _colorize(stack_status, args):
     :param args: args
     :return: colorized status string
     """
-    if not args.color:
-        return stack_status
-    end = "0m"
-    status_to_color = {"COMPLETE": "0;32m", "FAILED": "0;31m", "IN_PROGRESS": "10;33m"}
-    for status_label in status_to_color:
-        if status_label in stack_status:
-            return "\033[%s%s\033[%s" % (status_to_color[status_label], stack_status, end)
+    if args.color:
+        end = "0m"
+        status_to_color = {"COMPLETE": "0;32m", "FAILED": "0;31m", "IN_PROGRESS": "10;33m"}
+        for status_label in status_to_color:
+            if status_label in stack_status:
+                return "\033[%s%s\033[%s" % (status_to_color[status_label], stack_status, end)
+    return stack_status
 
 
 def list_clusters(args):
@@ -199,6 +199,7 @@ def instances(args):
 
 
 def ssh(args, extra_args):
+    # pylint: disable=import-outside-toplevel
     """
     Execute an SSH command to the head node instance, according to the [aliases] section if there.
 
