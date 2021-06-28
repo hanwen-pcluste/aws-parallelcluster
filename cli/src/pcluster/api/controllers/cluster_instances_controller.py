@@ -6,12 +6,20 @@
 # OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pcluster.api.controllers.common import (
+    check_cluster_version,
+    configure_aws_region,
+    convert_errors,
+    http_success_status_code,
+)
+from pcluster.api.converters import api_node_type_to_cluster_node_type
+from pcluster.api.errors import BadRequestException, NotFoundException
+from pcluster.api.models import ClusterInstance, DescribeClusterInstancesResponseContent
+from pcluster.api.models import NodeType as ApiNodeType
+from pcluster.aws.aws_resources import InstanceInfo
+from pcluster.models.cluster import Cluster, NodeType
+
 # pylint: disable=W0613
-
-from datetime import datetime
-
-from pcluster.api.controllers.common import configure_aws_region
-from pcluster.api.models import ClusterInstance, DescribeClusterInstancesResponseContent, InstanceState, NodeType
 
 
 @configure_aws_region()
@@ -32,6 +40,7 @@ def delete_cluster_instances(cluster_name, region=None, force=None):
 
 
 @configure_aws_region()
+@convert_errors()
 def describe_cluster_instances(cluster_name, region=None, next_token=None, node_type=None, queue_name=None):
     """
     Describe the instances belonging to a given cluster.
@@ -49,16 +58,26 @@ def describe_cluster_instances(cluster_name, region=None, next_token=None, node_
 
     :rtype: DescribeClusterInstancesResponseContent
     """
-    return DescribeClusterInstancesResponseContent(
-        [
-            ClusterInstance(
-                instance_id="id",
-                launch_time=datetime.now(),
-                public_ip_address="1.2.3.4",
-                instance_type="c5.xlarge",
-                state=InstanceState.RUNNING,
-                private_ip_address="1.2.3.4",
-                node_type=NodeType.HEAD,
-            )
-        ]
+    cluster = Cluster(cluster_name)
+    node_type = api_node_type_to_cluster_node_type(node_type)
+    instances, next_token = cluster.describe_instances(
+        next_token=next_token, node_type=node_type, queue_name=queue_name
     )
+    ec2_instances = []
+    for instance in instances:
+        instance_info = InstanceInfo(instance)
+        ec2_instances.append(
+            ClusterInstance(
+                instance_id=instance_info.id,
+                launch_time=instance_info.launch_time,
+                public_ip_address=instance_info.public_ip,
+                instance_type=instance_info.instance_type,
+                state=instance_info.state,
+                private_ip_address=instance_info.private_ip,
+                node_type=ApiNodeType.HEAD
+                if instance_info.node_type == NodeType.HEAD_NODE.value
+                else ApiNodeType.COMPUTE,
+                queue_name=instance_info.queue_name,
+            )
+        )
+    return DescribeClusterInstancesResponseContent(instances=ec2_instances, next_token=next_token)

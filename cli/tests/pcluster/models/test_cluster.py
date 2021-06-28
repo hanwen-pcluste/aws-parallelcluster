@@ -68,7 +68,7 @@ class TestCluster:
             ],
         )
 
-        instances = cluster._describe_instances(node_type=node_type)
+        instances = cluster.describe_instances(node_type=node_type)
         assert_that(instances).is_length(expected_instances)
 
     @pytest.mark.parametrize(
