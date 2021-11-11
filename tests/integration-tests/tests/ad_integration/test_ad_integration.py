@@ -290,9 +290,7 @@ def test_ad_integration(
     if directory_type:
         post_install_script_name = "all-nodes-ldap.sh"
         bucket_name = s3_bucket_factory()
-        directory_stack_name = directory_factory(
-            request.config.getoption("directory_stack_name"), directory_type, bucket_name, str(test_datadir), region
-        )
+        directory_stack_name = "MultiUserInfraStackSimpleAD"
         config_params.update(get_ad_config_param_vals(directory_stack_name, bucket_name, post_install_script_name))
         bucket = boto3.resource("s3", region_name=region).Bucket(bucket_name)
         bucket.upload_file(str(test_datadir / post_install_script_name), post_install_script_name)
