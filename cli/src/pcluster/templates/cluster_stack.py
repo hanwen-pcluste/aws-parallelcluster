@@ -38,6 +38,7 @@ from aws_cdk.core import (
     Fn,
     Stack,
 )
+from jinja2 import BaseLoader, Environment
 
 from pcluster.aws.aws_api import AWSApi
 from pcluster.config.cluster_config import (
@@ -1360,6 +1361,80 @@ class ComputeFleetConstruct(Construct):
                 ),
             )
 
+        user_data_template = get_user_data_content("../resources/compute_node/user_data.sh")
+        environment = Environment(loader=BaseLoader)  # nosec nosemgrep
+        rendered_user_data = environment.from_string(user_data_template).render(
+            dna_json=json.dumps(
+                {
+                    "cluster": {
+                        "stack_name": "${AWS::StackName}",
+                        "enable_efa": "efa" if compute_resource.efa and compute_resource.efa.enabled else "NONE",
+                        "raid_parameters": get_shared_storage_options_by_type(
+                            self._shared_storage_options, SharedStorageType.RAID
+                        ),
+                        "base_os": self._config.image.os,
+                        "preinstall": queue_pre_install_action.script if queue_pre_install_action else "NONE",
+                        "preinstall_args": join_shell_args(queue_pre_install_action.args)
+                        if queue_pre_install_action and queue_pre_install_action.args
+                        else "NONE",
+                        "postinstall": queue_post_install_action.script if queue_post_install_action else "NONE",
+                        "postinstall_args": join_shell_args(queue_post_install_action.args)
+                        if queue_post_install_action and queue_post_install_action.args
+                        else "NONE",
+                        "region": "${AWS::Region}",
+                        "efs_fs_id": get_shared_storage_ids_by_type(
+                            self._shared_storage_mappings, SharedStorageType.EFS
+                        ),
+                        "efs_shared_dir": get_shared_storage_options_by_type(
+                            self._shared_storage_options, SharedStorageType.EFS
+                        ),
+                        "fsx_fs_id": get_shared_storage_ids_by_type(
+                            self._shared_storage_mappings, SharedStorageType.FSX
+                        ),
+                        "fsx_mount_name": self._shared_storage_attributes[SharedStorageType.FSX].get("MountName", ""),
+                        "fsx_dns_name": self._shared_storage_attributes[SharedStorageType.FSX].get("DNSName", ""),
+                        "fsx_options": get_shared_storage_options_by_type(
+                            self._shared_storage_options, SharedStorageType.FSX
+                        ),
+                        "scheduler": self._config.scheduling.scheduler,
+                        "disable_hyperthreading_manually": "true"
+                        if compute_resource.disable_simultaneous_multithreading_manually
+                        else "false",
+                        "ephemeral_dir": queue.compute_settings.local_storage.ephemeral_volume.mount_dir
+                        if queue.compute_settings
+                        and queue.compute_settings.local_storage
+                        and queue.compute_settings.local_storage.ephemeral_volume
+                        else "/scratch",
+                        "ebs_shared_dirs": get_shared_storage_options_by_type(
+                            self._shared_storage_options, SharedStorageType.EBS
+                        ),
+                        "proxy": "${ProxyServer}",
+                        "ddb_table": "${DynamoDBTable}",
+                        "log_group_name": self._log_group.log_group_name
+                        if self._config.monitoring.logs.cloud_watch.enabled
+                        else "NONE",
+                        "dns_domain": "${ClusterDNSDomain}",
+                        "hosted_zone": "${ClusterHostedZone}",
+                        "node_type": "ComputeFleet",
+                        "cluster_user": OS_MAPPING[self._config.image.os]["user"],
+                        "enable_intel_hpc_platform": "true" if self._config.is_intel_hpc_platform_enabled else "false",
+                        "cw_logging_enabled": "true" if self._config.is_cw_logging_enabled else "false",
+                        "scheduler_queue_name": queue.name,
+                        "scheduler_compute_resource_name": compute_resource.name,
+                        "enable_efa_gdr": "compute"
+                        if compute_resource.efa and compute_resource.efa.gdr_support
+                        else "NONE",
+                        "custom_node_package": self._config.custom_node_package or "",
+                        "custom_awsbatchcli_package": self._config.custom_aws_batch_cli_package or "",
+                        "use_private_hostname": str(
+                            get_attr(self._config, "scheduling.settings.dns.use_ec2_hostnames", default=False)
+                        ).lower(),
+                        "head_node_private_ip": "${HeadNodePrivateIp}",
+                        "directory_service": self._config.get_directory_service_dna_json(),
+                    }
+                }
+            )
+        )
         return ec2.CfnLaunchTemplate(
             self,
             f"LaunchTemplate{create_hash_suffix(queue.name + compute_resource.name)}",
@@ -1386,79 +1461,18 @@ class ComputeFleetConstruct(Construct):
                 instance_initiated_shutdown_behavior="terminate",
                 user_data=Fn.base64(
                     Fn.sub(
-                        get_user_data_content("../resources/compute_node/user_data.sh"),
+                        rendered_user_data,
                         {
                             **{
-                                "EnableEfa": "efa" if compute_resource.efa and compute_resource.efa.enabled else "NONE",
-                                "RAIDOptions": get_shared_storage_options_by_type(
-                                    self._shared_storage_options, SharedStorageType.RAID
-                                ),
-                                "DisableHyperThreadingManually": "true"
-                                if compute_resource.disable_simultaneous_multithreading_manually
-                                else "false",
-                                "BaseOS": self._config.image.os,
-                                "PreInstallScript": queue_pre_install_action.script
-                                if queue_pre_install_action
-                                else "NONE",
-                                "PreInstallArgs": join_shell_args(queue_pre_install_action.args)
-                                if queue_pre_install_action and queue_pre_install_action.args
-                                else "NONE",
-                                "PostInstallScript": queue_post_install_action.script
-                                if queue_post_install_action
-                                else "NONE",
-                                "PostInstallArgs": join_shell_args(queue_post_install_action.args)
-                                if queue_post_install_action and queue_post_install_action.args
-                                else "NONE",
-                                "EFSId": get_shared_storage_ids_by_type(
-                                    self._shared_storage_mappings, SharedStorageType.EFS
-                                ),
-                                "EFSOptions": get_shared_storage_options_by_type(
-                                    self._shared_storage_options, SharedStorageType.EFS
-                                ),
-                                "FSXId": get_shared_storage_ids_by_type(
-                                    self._shared_storage_mappings, SharedStorageType.FSX
-                                ),
-                                "FSXMountName": self._shared_storage_attributes[SharedStorageType.FSX].get(
-                                    "MountName", ""
-                                ),
-                                "FSXDNSName": self._shared_storage_attributes[SharedStorageType.FSX].get("DNSName", ""),
-                                "FSXOptions": get_shared_storage_options_by_type(
-                                    self._shared_storage_options, SharedStorageType.FSX
-                                ),
-                                "Scheduler": self._config.scheduling.scheduler,
-                                "EphemeralDir": queue.compute_settings.local_storage.ephemeral_volume.mount_dir
-                                if queue.compute_settings
-                                and queue.compute_settings.local_storage
-                                and queue.compute_settings.local_storage.ephemeral_volume
-                                else "/scratch",
-                                "EbsSharedDirs": get_shared_storage_options_by_type(
-                                    self._shared_storage_options, SharedStorageType.EBS
-                                ),
                                 "ClusterDNSDomain": str(self._cluster_hosted_zone.name)
                                 if self._cluster_hosted_zone
                                 else "",
                                 "ClusterHostedZone": str(self._cluster_hosted_zone.ref)
                                 if self._cluster_hosted_zone
                                 else "",
-                                "OSUser": OS_MAPPING[self._config.image.os]["user"],
                                 "DynamoDBTable": self._dynamodb_table.ref if self._dynamodb_table else "NONE",
-                                "LogGroupName": self._log_group.log_group_name
-                                if self._config.monitoring.logs.cloud_watch.enabled
-                                else "NONE",
-                                "IntelHPCPlatform": "true" if self._config.is_intel_hpc_platform_enabled else "false",
-                                "CWLoggingEnabled": "true" if self._config.is_cw_logging_enabled else "false",
-                                "QueueName": queue.name,
-                                "ComputeResourceName": compute_resource.name,
-                                "EnableEfaGdr": "compute"
-                                if compute_resource.efa and compute_resource.efa.gdr_support
-                                else "NONE",
-                                "CustomNodePackage": self._config.custom_node_package or "",
-                                "CustomAwsBatchCliPackage": self._config.custom_aws_batch_cli_package or "",
-                                "ExtraJson": self._config.extra_chef_attributes,
-                                "UsePrivateHostname": str(
-                                    get_attr(self._config, "scheduling.settings.dns.use_ec2_hostnames", default=False)
-                                ).lower(),
                                 "HeadNodePrivateIp": self._head_eni.attr_primary_private_ip_address,
+                                "ExtraJson": self._config.extra_chef_attributes,
                             },
                             **get_common_user_data_env(queue, self._config),
                         },

@@ -47,45 +47,7 @@ write_files:
     permissions: '0644'
     owner: root:root
     content: |
-      {
-        "cluster": {
-          "stack_name": "${AWS::StackName}",
-          "enable_efa": "${EnableEfa}",
-          "raid_parameters": "${RAIDOptions}",
-          "base_os": "${BaseOS}",
-          "preinstall": "${PreInstallScript}",
-          "preinstall_args": "${PreInstallArgs}",
-          "postinstall": "${PostInstallScript}",
-          "postinstall_args": "${PostInstallArgs}",
-          "region": "${AWS::Region}",
-          "efs_fs_id": "${EFSId}",
-          "efs_shared_dir": "${EFSOptions}",
-          "fsx_fs_id": "${FSXId}",
-          "fsx_mount_name": "${FSXMountName}",
-          "fsx_dns_name": "${FSXDNSName}",
-          "fsx_options": "${FSXOptions}",
-          "scheduler": "${Scheduler}",
-          "disable_hyperthreading_manually": "${DisableHyperThreadingManually}",
-          "ephemeral_dir": "${EphemeralDir}",
-          "ebs_shared_dirs": "${EbsSharedDirs}",
-          "proxy": "${ProxyServer}",
-          "ddb_table": "${DynamoDBTable}",
-          "log_group_name": "${LogGroupName}",
-          "dns_domain": "${ClusterDNSDomain}",
-          "hosted_zone": "${ClusterHostedZone}",
-          "node_type": "ComputeFleet",
-          "cluster_user": "${OSUser}",
-          "enable_intel_hpc_platform": "${IntelHPCPlatform}",
-          "cw_logging_enabled": "${CWLoggingEnabled}",
-          "scheduler_queue_name": "${QueueName}",
-          "scheduler_compute_resource_name": "${ComputeResourceName}",
-          "enable_efa_gdr": "${EnableEfaGdr}",
-          "custom_node_package": "${CustomNodePackage}",
-          "custom_awsbatchcli_package": "${CustomAwsBatchCliPackage}",
-          "use_private_hostname": "${UsePrivateHostname}",
-          "head_node_private_ip": "${HeadNodePrivateIp}"
-        }
-      }
+      {{ dna_json }}
   - path: /etc/chef/client.rb
     permissions: '0644'
     owner: root:root
