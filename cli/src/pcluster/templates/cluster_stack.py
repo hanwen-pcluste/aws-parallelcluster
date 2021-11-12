@@ -898,6 +898,9 @@ class ClusterCdkStack(Stack):
                     "use_private_hostname": str(self.config.scheduling.settings.dns.use_ec2_hostnames).lower()
                     if self._condition_is_slurm()
                     else "false",
+                    "directory_service": self.config.get_directory_service_dna_json()
+                    if self._condition_is_slurm()
+                    else {},
                 },
             },
             indent=4,

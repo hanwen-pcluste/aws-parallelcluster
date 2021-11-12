@@ -36,16 +36,6 @@ Scheduling:
       Iam:
         AdditionalIamPolicies:
           - Policy: arn:aws:iam::aws:policy/AdministratorAccess
-      {% if post_install_script_uri %}
-      CustomActions:
-        OnNodeConfigured:
-          Script: {{ post_install_script_uri }}
-          Args:
-            - {{ ldap_uri }}
-            - {{ ldap_search_base }}
-            - {{ ldap_default_bind_dn }}
-            - {{ ldap_client_password }}
-      {% endif %}
 Monitoring:
   Logs:
     CloudWatch:
@@ -60,3 +50,8 @@ SharedStorage:
   - MountDir: /ebs
     Name: ebs
     StorageType: Ebs
+DirectoryService:
+  DomainName: {{ ldap_search_base }}
+  DomainAddr: {{ ldap_uri }}
+  PasswordSecretArn: fake
+  DomainReadOnlyUser: {{ ldap_default_bind_dn }}

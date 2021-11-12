@@ -38,6 +38,7 @@ from pcluster.config.cluster_config import (
     CustomActions,
     Dashboards,
     Dcv,
+    DirectoryService,
     Dns,
     Efa,
     EphemeralVolume,
@@ -1548,6 +1549,27 @@ class SchedulingSchema(BaseSchema):
         return adapted_data
 
 
+class DirectoryServiceSchema(BaseSchema):
+    """Represent the schema of the DirectoryService."""
+
+    domain_name = fields.Str(required=True, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    domain_addr = fields.Str(required=True, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    password_secret_arn = fields.Str(required=True, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    domain_read_only_user = fields.Str(required=True, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    ldap_tls_ca_cert = fields.Str(metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    ldap_tls_req_cert = fields.Str(
+        validate=validate.OneOf(["never", "allow", "try", "demand", "hard"]),
+        metadata={"update_policy": UpdatePolicy.UNSUPPORTED},
+    )
+    ldap_access_filter = fields.Str(metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    generate_ssh_keys_for_users = fields.Bool(metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+
+    @post_load
+    def make_resource(self, data, **kwargs):
+        """Generate resource."""
+        return DirectoryService(**data)
+
+
 class ClusterSchema(BaseSchema):
     """Represent the schema of the Cluster."""
 
@@ -1569,6 +1591,7 @@ class ClusterSchema(BaseSchema):
     additional_packages = fields.Nested(AdditionalPackagesSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
     tags = fields.Nested(TagSchema, many=True, metadata={"update_policy": UpdatePolicy.SUPPORTED, "update_key": "Key"})
     iam = fields.Nested(ClusterIamSchema, metadata={"update_policy": UpdatePolicy.SUPPORTED})
+    directory_service = fields.Nested(DirectoryServiceSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
     config_region = fields.Str(data_key="Region", metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
     custom_s3_bucket = fields.Str(metadata={"update_policy": UpdatePolicy.READ_ONLY_RESOURCE_BUCKET})
     additional_resources = fields.Str(metadata={"update_policy": UpdatePolicy.SUPPORTED})
