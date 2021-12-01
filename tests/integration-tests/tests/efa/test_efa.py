@@ -34,6 +34,8 @@ def test_efa(
     architecture,
     network_interfaces_count,
     mpi_variants,
+    run_benchmarks,
+    request,
 ):
     """
     Test all EFA Features.
@@ -58,34 +60,35 @@ def test_efa(
     logging.info("Running on Instances: {0}".format(get_compute_nodes_instance_ids(cluster.cfn_name, region)))
 
     if instance in osu_benchmarks_instances:
-        benchmark_failures = []
-
-        # Run OSU benchmarks in efa-enabled queue.
-        for mpi_version in mpi_variants:
-            benchmark_failures.extend(
-                _test_osu_benchmarks_pt2pt(
-                    mpi_version,
-                    remote_command_executor,
-                    scheduler_commands,
-                    test_datadir,
-                    instance,
-                    slots_per_instance,
-                    partition="efa-enabled",
-                )
-            )
-            benchmark_failures.extend(
-                _test_osu_benchmarks_collective(
-                    mpi_version,
-                    remote_command_executor,
-                    scheduler_commands,
-                    test_datadir,
-                    instance,
-                    num_of_instances=max_queue_size,
-                    slots_per_instance=slots_per_instance,
-                    partition="efa-enabled",
-                )
-            )
-        assert_that(benchmark_failures, description="Some OSU benchmarks are failing").is_empty()
+        run_benchmarks(remote_command_executor, scheduler_commands)
+        # benchmark_failures = []
+        #
+        # # Run OSU benchmarks in efa-enabled queue.
+        # for mpi_version in mpi_variants:
+        #     benchmark_failures.extend(
+        #         _test_osu_benchmarks_pt2pt(
+        #             mpi_version,
+        #             remote_command_executor,
+        #             scheduler_commands,
+        #             test_datadir,
+        #             instance,
+        #             slots_per_instance,
+        #             partition="efa-enabled",
+        #         )
+        #     )
+        #     benchmark_failures.extend(
+        #         _test_osu_benchmarks_collective(
+        #             mpi_version,
+        #             remote_command_executor,
+        #             scheduler_commands,
+        #             test_datadir,
+        #             instance,
+        #             num_of_instances=max_queue_size,
+        #             slots_per_instance=slots_per_instance,
+        #             partition="efa-enabled",
+        #         )
+        #     )
+        # assert_that(benchmark_failures, description="Some OSU benchmarks are failing").is_empty()
 
     if network_interfaces_count > 1:
         _test_osu_benchmarks_multiple_bandwidth(
