@@ -479,8 +479,6 @@ def _run_benchmarks(
 def test_ad_integration(
     region,
     scheduler,
-    instance,
-    os,
     pcluster_config_reader,
     clusters_factory,
     directory_type,
@@ -489,6 +487,7 @@ def test_ad_integration(
     directory_factory,
     request,
     store_secret_in_secret_manager,
+    run_benchmarks,
 ):
     """Verify AD integration works as expected."""
     compute_instance_type_info = {"name": "c5.xlarge", "num_cores": 4}
