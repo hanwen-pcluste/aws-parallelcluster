@@ -207,6 +207,13 @@ efa:
         instances: ["c5n.18xlarge"]
         oss: ["alinux2"]
         schedulers: ["slurm"]
+        benchmarks:
+          - mpi_variants: ["openmpi", "intelmpi"]
+            num_of_instances: [4]
+            partition: "efa-enabled"
+            osu_benchmarks:
+              collective: ["osu_allgather", "osu_bcast", "osu_allreduce", "osu_alltoall"]
+              pt2pt: ["osu_latency", "osu_bibw"]
       # Temporarily disabling p4d tests
       # - regions: ["us-west-2"]
       #   instances: ["p4d.24xlarge"]
