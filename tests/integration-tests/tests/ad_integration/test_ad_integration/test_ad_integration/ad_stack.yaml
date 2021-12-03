@@ -48,9 +48,7 @@ Resources:
     Properties:
       DomainName: {{ ad_domain_name }} {{ default_ec2_domain }}
       DomainNameServers:
-        Fn::GetAtt:
-          - Directory
-          - DnsIpAddresses
+        - AmazonProvidedDNS
   AdDomainAdminNodeWaitConditionHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
   VpcDhcpOptsSetAssociation:
