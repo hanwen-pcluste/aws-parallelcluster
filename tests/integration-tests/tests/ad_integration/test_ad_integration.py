@@ -225,7 +225,7 @@ def _create_nlb_stack(cfn_stacks_factory, request, directory_stack, region, test
     )
     logging.info("Creating stack %s", nlb_stack_name)
     # TODO: don't hardcode this ARN
-    certificate_arn = "arn:aws:acm:us-east-1:931086791537:certificate/649885e3-73da-4225-83a1-1b1c8a87c1f3"
+    certificate_arn = "arn:aws:acm:eu-west-1:931086791537:certificate/20a3fd77-115d-4dea-b5cf-2d4768c95708"
     nlb_stack = None
     with open(nlb_stack_template_path) as nlb_stack_template:
         nlb_stack = CfnStack(
