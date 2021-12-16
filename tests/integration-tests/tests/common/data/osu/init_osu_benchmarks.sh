@@ -3,7 +3,7 @@ set -e
 
 MPI_VERSION=${1}
 
-OSU_BENCHMARKS_VERSION={{ osu_benchmark_version }}
+OSU_BENCHMARKS_VERSION=5.7.1
 OSU_BENCHMARKS_PACKAGE_NAME="osu-micro-benchmarks-${OSU_BENCHMARKS_VERSION}"
 
 module load ${MPI_VERSION}

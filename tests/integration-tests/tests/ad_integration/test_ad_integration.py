@@ -50,21 +50,27 @@ def get_infra_stack_outputs(stack_name):
         for entry in cfn.describe_stacks(StackName=stack_name)["Stacks"][0]["Outputs"]
     }
 
+def get_infra_stack_parameters(stack_name):
+    cfn = boto3.client("cloudformation")
+    return {
+        entry.get("ParameterKey"): entry.get("ParameterValue")
+        for entry in cfn.describe_stacks(StackName=stack_name)["Stacks"][0]["Parameters"]
+    }
 
-def get_ad_config_param_vals(directory_stack_name, nlb_stack_name, password_secret_arn):
+
+def get_ad_config_param_vals(directory_stack_outputs, nlb_stack_parameters, password_secret_arn, ldap_tls_ca_cert):
     """Return a dict used to set values for config file parameters."""
-    directory_stack_outputs = get_infra_stack_outputs(directory_stack_name)
-    nlb_stack_outputs = get_infra_stack_outputs(nlb_stack_name)
     ldap_search_base = ",".join(
         [f"dc={domain_component}" for domain_component in directory_stack_outputs.get("DomainName").split(".")]
     )
     read_only_username = directory_stack_outputs.get("ReadOnlyUserName")
     return {
-        "ldaps_uri": nlb_stack_outputs.get("LDAPSURL"),
+        "ldaps_uri": nlb_stack_parameters.get("DomainName"),
         "ldap_search_base": ldap_search_base,
         # TODO: is the CN=Users portion of this a valid assumption?
         "ldap_default_bind_dn": f"CN={read_only_username},CN=Users,{ldap_search_base}",
         "password_secret_arn": password_secret_arn,
+        "ldap_tls_ca_cert": ldap_tls_ca_cert,
     }
 
 
@@ -115,30 +121,30 @@ def zip_dir(path):
 
 
 @pytest.fixture(scope="class")
-def store_secret_in_secret_manager(request, region, cfn_stacks_factory):
+def store_secret_in_secret_manager(request, cfn_stacks_factory):
 
-    secret_stack_name = generate_stack_name("integ-tests-secret", request.config.getoption("stackname_suffix"))
+    secret_arns = []
+    secrets_manager_client = boto3.client("secretsmanager")
 
-    def _store_secret(secret):
-        template = Template()
-        template.set_version("2010-09-09")
-        template.set_description("stack to store a secret string")
-        template.add_resource(Secret("Secret", SecretString=secret))
-        stack = CfnStack(
-            name=secret_stack_name,
-            region=region,
-            template=template.to_json(),
-        )
-        cfn_stacks_factory.create_stack(stack)
-        return stack.cfn_resources["Secret"]
+    def _store_secret(secret_string=None, secret_binary=None):
+        if secret_string is None and secret_binary is None:
+            logging.error("secret string and scecret binary can not both be empty")
+        secret_name = generate_stack_name("integ-tests-secret", request.config.getoption("stackname_suffix"))
+        if secret_string:
+            secret_arn = secrets_manager_client.create_secret(Name=secret_name, SecretString=secret_string)["ARN"]
+        else:
+            secret_arn = secrets_manager_client.create_secret(Name=secret_name, SecretBinary=secret_binary)["ARN"]
+        secret_arns.append(secret_arn)
+        return secret_arn
 
     yield _store_secret
 
     if request.config.getoption("no_delete"):
-        logging.info("Not deleting stack %s because --no-delete option was specified", secret_stack_name)
+        logging.info("Not deleting stack secrets because --no-delete option was specified")
     else:
-        logging.info("Deleting stack %s", secret_stack_name)
-        cfn_stacks_factory.delete_stack(secret_stack_name, region)
+        for secret_arn in secret_arns:
+            logging.info("Deleting secrete %s", secret_arn)
+            secrets_manager_client.delete_secret(SecretId=secret_arn)
 
 
 def _create_directory_stack(cfn_stacks_factory, request, directory_type, test_resources_dir, region, vpc_stack):
@@ -218,7 +224,7 @@ def _populate_directory_with_users(directory_stack, num_users_to_create, region)
     logging.info("Creation of %s users in directory service completed", str(num_users_to_create))
 
 
-def _create_nlb_stack(cfn_stacks_factory, request, directory_stack, region, test_resources_dir, certificate_arn):
+def _create_nlb_stack(cfn_stacks_factory, request, directory_stack, region, test_resources_dir, certificate_arn, certificate_secret_arn, domain_name):
     nlb_stack_template_path = os_lib.path.join(test_resources_dir, "NLB_SimpleAD.yaml")
     nlb_stack_name = generate_stack_name(
         "integ-tests-MultiUserInfraStackNLB", request.config.getoption("stackname_suffix")
@@ -255,6 +261,14 @@ def _create_nlb_stack(cfn_stacks_factory, request, directory_stack, region, test
                     "ParameterKey": "SimpleADSecIP",
                     "ParameterValue": directory_stack.cfn_outputs["DirectoryDnsIpAddresses"].split(",")[1],
                 },
+                {
+                    "ParameterKey": "CertificateSecretArn",
+                    "ParameterValue": certificate_secret_arn,
+                },
+                {
+                    "ParameterKey": "DomainName",
+                    "ParameterValue": domain_name,
+                },
             ],
         )
     cfn_stacks_factory.create_stack(nlb_stack)
@@ -262,11 +276,10 @@ def _create_nlb_stack(cfn_stacks_factory, request, directory_stack, region, test
     return nlb_stack
 
 
-def _generate_certificate():
+def _generate_certificate(common_name):
     key = crypto.PKey()
     key.generate_key(TYPE_RSA, 2048)
     crt = X509()
-    common_name = "ldap.simplead.multiuser.pcluster"
     crt.get_subject().commonName = common_name
     crt.get_issuer().commonName = common_name
     now = datetime.datetime.now()
@@ -277,10 +290,12 @@ def _generate_certificate():
     crt.set_serial_number(random.randrange(1, 99999))
     crt.set_pubkey(key)
     crt.sign(key, "sha256")
+    certificate = dump_certificate(FILETYPE_PEM, crt)
+    private_key = dump_privatekey(FILETYPE_PEM, key)
     certificate_arn = boto3.client("acm").import_certificate(
-        Certificate=dump_certificate(FILETYPE_PEM, crt), PrivateKey=dump_privatekey(FILETYPE_PEM, key)
+        Certificate=certificate, PrivateKey=private_key
     )["CertificateArn"]
-    return certificate_arn
+    return certificate_arn, certificate
 
 
 @pytest.fixture(scope="module")
@@ -290,7 +305,7 @@ def directory_factory(request, cfn_stacks_factory, vpc_stacks):
     created_certificates = defaultdict(dict)
 
     def _directory_factory(
-        existing_directory_stack_name, existing_nlb_stack_name, directory_type, test_resources_dir, region
+        existing_directory_stack_name, existing_nlb_stack_name, directory_type, test_resources_dir, region, store_secret_in_secret_manager
     ):
         if existing_directory_stack_name:
             directory_stack_name = existing_directory_stack_name
@@ -315,10 +330,12 @@ def directory_factory(request, cfn_stacks_factory, vpc_stacks):
             nlb_stack_name = created_directory_stacks.get(region, {}).get("nlb")
             logging.info("Using NLB stack named %s created by another test", nlb_stack_name)
         else:
-            certificate_arn = _generate_certificate()
+            common_name = "ldap.simplead.multiuser.pcluster"
+            certificate_arn, certificate = _generate_certificate(common_name)
+            certificate_secret_arn = store_secret_in_secret_manager(secret_binary=certificate)
             created_certificates[region] = certificate_arn
             nlb_stack_name = _create_nlb_stack(
-                cfn_stacks_factory, request, directory_stack, region, test_resources_dir, certificate_arn
+                cfn_stacks_factory, request, directory_stack, region, test_resources_dir, certificate_arn, certificate_secret_arn, common_name
             ).name
             created_directory_stacks[region]["nlb"] = nlb_stack_name
         return directory_stack_name, nlb_stack_name
@@ -340,7 +357,8 @@ def directory_factory(request, cfn_stacks_factory, vpc_stacks):
                 cfn_stacks_factory.delete_stack(stack_name, region)
 
     for region, certificate_arn in created_certificates.items():
-        boto3.client("acm", region_name=region).delete_certificate(CertificateArn=certificate_arn)
+        if request.config.getoption("no_delete"):
+            boto3.client("acm", region_name=region).delete_certificate(CertificateArn=certificate_arn)
 
 
 def _run_user_workloads(users, test_datadir, remote_command_executor):
@@ -498,17 +516,26 @@ def test_ad_integration(
         directory_type,
         str(test_datadir),
         region,
+        store_secret_in_secret_manager,
     )
     directory_stack_outputs = get_infra_stack_outputs(directory_stack_name)
     ad_user_password = directory_stack_outputs.get("UserPassword")
-    password_secret_arn = store_secret_in_secret_manager(directory_stack_outputs.get("AdminPassword"))
-    config_params.update(get_ad_config_param_vals(directory_stack_name, nlb_stack_name, password_secret_arn))
+    password_secret_arn = store_secret_in_secret_manager(secret_string=directory_stack_outputs.get("AdminPassword"))
+    nlb_stack_parameters = get_infra_stack_parameters(nlb_stack_name)
+    ldap_tls_ca_cert = "/opt/parallelcluster/shared/directory_service/certificate.crt"
+    config_params.update(get_ad_config_param_vals(directory_stack_outputs, nlb_stack_parameters, password_secret_arn, ldap_tls_ca_cert))
     cluster_config = pcluster_config_reader(**config_params)
     cluster = clusters_factory(cluster_config)
+
+    certificate_secret_arn = nlb_stack_parameters.get("CertificateSecretArn")
+    certificate = boto3.client("secretsmanager").get_secret_value(SecretId=certificate_secret_arn)["SecretBinary"]
+    with open(test_datadir / "certificate.crt", "wb") as f:
+        f.write(certificate)
 
     # Publish compute node count metric every minute via cron job
     # TODO: use metrics reporter from the benchmarks module
     remote_command_executor = RemoteCommandExecutor(cluster)
+    remote_command_executor.run_remote_command(f"sudo cp certificate.crt {ldap_tls_ca_cert} && sudo service sssd restart", additional_files=[test_datadir / "certificate.crt"])
     metric_publisher_script = "publish_compute_node_count_metric.sh"
     remote_metric_publisher_script_path = f"/shared/{metric_publisher_script}"
     crontab_expression = f"* * * * * {remote_metric_publisher_script_path} &> {remote_metric_publisher_script_path}.log"
