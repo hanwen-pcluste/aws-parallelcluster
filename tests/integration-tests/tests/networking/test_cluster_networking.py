@@ -163,7 +163,7 @@ def _run_mpi_jobs(mpi_variants, remote_command_executor, test_datadir, slurm_com
         )
         result = slurm_commands.submit_script(str(submission_script))
         job_id = slurm_commands.assert_job_submitted(result.stdout)
-        slurm_commands.wait_job_completed(job_id)
+        slurm_commands.wait_job_completed(job_id, timeout=15)
         slurm_commands.assert_job_succeeded(job_id)
     logging.info("Checking cluster has two nodes after running MPI jobs")  # 1 static node + 1 dynamic node
     assert_that(len(get_compute_nodes_instance_ids(cluster.cfn_name, region))).is_equal_to(2)

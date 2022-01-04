@@ -87,6 +87,7 @@ write_files:
           "custom_node_package": "${CustomNodePackage}",
           "custom_awsbatchcli_package": "${CustomAwsBatchCliPackage}",
           "use_private_hostname": "${UsePrivateHostname}",
+          "workaround_with_private_hostname": "${WorkaroundWithPrivateHostname}",
           "head_node_private_ip": "${HeadNodePrivateIp}",
           "directory_service": {
             "enabled": "${DirectoryServiceEnabled}"
