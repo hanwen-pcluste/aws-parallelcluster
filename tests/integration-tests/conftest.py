@@ -1229,19 +1229,26 @@ def run_benchmarks(request, mpi_variants, test_datadir, instance, os, region, be
                         "Os": os,
                         "Partition": partition,
                     }
-                    result = scheduler_commands.submit_command("sleep 30", nodes=num_of_instances, partition=partition)
+                    result = scheduler_commands.submit_command("srun id", nodes=num_of_instances, partition=partition)
                     job_id = scheduler_commands.assert_job_submitted(result.stdout)
                     start = time.time()
                     scheduler_commands.wait_job_running(job_id)
                     end = time.time()
-                    metric_data = []
-                    metric_data.append(
-                        {
-                            "MetricName": "JobStartTime",
-                            "Dimensions": [{"Name": name, "Value": str(value)} for name, value in dimensions.items()],
-                            "Value": end - start,
-                            "Unit": "Microseconds",
-                        }
+                    metric_data = [
+                        (
+                            {
+                                "MetricName": "JobStartTime",
+                                "Dimensions": [
+                                    {"Name": name, "Value": str(value)} for name, value in dimensions.items()
+                                ],
+                                "Value": end - start,
+                                "Unit": "Microseconds",
+                            }
+                        )
+                    ]
+                    cloudwatch_client.put_metric_data(
+                        Namespace=f"ParallelCluster/{request.function.__name__}",
+                        MetricData=metric_data,
                     )
                     scheduler_commands.wait_job_completed(job_id)
                     osu_benchmarks = benchmark.get("osu_benchmarks", [])
@@ -1262,6 +1269,7 @@ def run_benchmarks(request, mpi_variants, test_datadir, instance, os, region, be
                                     timeout=120,
                                 )
                                 logging.info("Pushing benchmarks %s metrics for %s", osu_benchmark_name, function_name)
+                                metric_data = []
                                 for packet_size, latency in re.findall(r"(\d+)\s+(\d+)\.", output):
                                     dimensions.update(
                                         {
