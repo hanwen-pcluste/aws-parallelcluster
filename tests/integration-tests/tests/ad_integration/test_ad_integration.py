@@ -259,7 +259,7 @@ def _populate_directory_with_users(directory_stack, num_users_to_create, region)
         DocumentName=document_name,
         InstanceIds=[directory_stack.cfn_resources["AdDomainAdminNode"]],
         MaxErrors="0",
-        TimeoutSeconds=num_users_to_create * 2 + 300,
+        TimeoutSeconds=num_users_to_create * 4 + 300,
         Parameters={"DirectoryId": [directory_id], "NumUsersToCreate": [str(num_users_to_create)]},
     )["Command"]["CommandId"]
     _check_ssm_success(ssm_client, command_id, admin_node_instance_id)
