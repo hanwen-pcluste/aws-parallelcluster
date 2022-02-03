@@ -65,7 +65,7 @@ TEST_DEFAULTS = {
     "custom_ami": None,
     "pre_install": None,
     "post_install": None,
-    "vpc_stack": "integ-tests-vpc-7we0iz7dwc0j4asv",
+    "vpc_stack": "integ-tests-vpc-a21xmly5yqnv6lzz",
     "api_uri": None,
     "cluster": None,
     "api_definition_s3_uri": None,
@@ -81,8 +81,8 @@ TEST_DEFAULTS = {
     "instance_types_data": None,
     "use_default_iam_credentials": True,
     "iam_user_role_stack_name": None,
-    "directory_stack_name": "integ-tests-MultiUserInfraStackSimpleAD-0kfbp1884zkk15w4",
-    "ldaps_nlb_stack_name": "integ-tests-MultiUserInfraStackNLB-7sd7n6pxo1wfpfuy",
+    "directory_stack_name": "integ-tests-MultiUserInfraStackMicrosoftAD-hp7sw2iof711wezw",
+    "ldaps_nlb_stack_name": "integ-tests-MultiUserInfraStackNLB-ycc6r2tv6t5d9bae",
 }
 
 
