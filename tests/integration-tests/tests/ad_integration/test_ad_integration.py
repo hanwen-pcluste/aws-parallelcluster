@@ -38,7 +38,7 @@ from tests.common.osu_common import compile_osu
 from tests.common.schedulers_common import get_scheduler_commands
 from tests.common.utils import get_sts_endpoint, retrieve_latest_ami
 
-NUM_USERS_TO_CREATE = 1000
+NUM_USERS_TO_CREATE = 500
 NUM_USERS_TO_TEST = 3
 
 
@@ -631,7 +631,7 @@ def test_ad_integration(
 @pytest.mark.parametrize(
     "directory_type,directory_protocol,directory_certificate_verification",
     [
-        # ("SimpleAD", "ldap", False),
+        ("SimpleAD", "ldap", False),
         # ("MicrosoftAD", "ldap", False),
     ],
 )
@@ -719,8 +719,8 @@ def test_ad_integration_without_nss_with_enumerate(
 @pytest.mark.parametrize(
     "directory_type,directory_protocol,directory_certificate_verification",
     [
-        # ("SimpleAD", "ldap", False),
-        ("MicrosoftAD", "ldap", False),
+        ("SimpleAD", "ldap", False),
+        # ("MicrosoftAD", "ldap", False),
     ],
 )
 def test_ad_integration_baseline(
