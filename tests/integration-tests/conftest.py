@@ -1211,7 +1211,7 @@ def mpi_variants(architecture):
 
 @pytest.fixture()
 def run_benchmarks(request, mpi_variants, test_datadir, instance, os, region, benchmarks):
-    def _run_benchmars(remote_command_executor, scheduler_commands, **kwargs):
+    def _run_benchmars(remote_command_executor, scheduler_commands, diretory_type="", **kwargs):
         function_name = request.function.__name__
         if request.config.getoption("benchmarks"):
             logging.info("Running benchmarks for %s", function_name)
@@ -1228,6 +1228,7 @@ def run_benchmarks(request, mpi_variants, test_datadir, instance, os, region, be
                         "Instance": instance,
                         "Os": os,
                         "Partition": partition,
+                        "DirectoryType": diretory_type,
                     }
                     result = scheduler_commands.submit_command("srun id", nodes=num_of_instances, partition=partition)
                     job_id = scheduler_commands.assert_job_submitted(result.stdout)
@@ -1266,7 +1267,7 @@ def run_benchmarks(request, mpi_variants, test_datadir, instance, os, region, be
                                     num_of_instances=num_of_instances,
                                     slots_per_instance=fetch_instance_slots(region, instance),
                                     test_datadir=test_datadir,
-                                    timeout=120,
+                                    timeout=10,
                                 )
                                 logging.info("Pushing benchmarks %s metrics for %s", osu_benchmark_name, function_name)
                                 metric_data = []

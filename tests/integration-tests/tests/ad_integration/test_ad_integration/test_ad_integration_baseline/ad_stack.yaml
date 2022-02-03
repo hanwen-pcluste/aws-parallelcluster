@@ -40,7 +40,7 @@ Resources:
         VpcId:
           Ref: Vpc
       {% if directory_type == "SimpleAD" %}
-      Size: Small
+      Size: Large
       {% endif %}
       {% if directory_type == "MicrosoftAD" %}
       Edition: Standard

@@ -1,7 +1,7 @@
 Image:
   Os: {{ os }}
 HeadNode:
-  InstanceType: c5n.18xlarge
+  InstanceType: {{ instance }}
   Networking:
     SubnetId: {{ public_subnet_id }}
   Ssh:
@@ -44,7 +44,8 @@ DirectoryService:
   DomainReadOnlyUser: {{ ldap_default_bind_dn }}
   LdapTlsCaCert: {{ ldap_tls_ca_cert }}
   LdapTlsReqCert: {{ ldap_tls_req_cert }}
-  GenerateSshKeysForUsers: false
+  GenerateSshKeysForUsers: true
+  LdapAccessFilter: "!(CN=PclusterUser3)"
   AdditionalSssdConfigs:
     debug_level: "0x1ff"
     {% if directory_protocol == "ldap" %}
