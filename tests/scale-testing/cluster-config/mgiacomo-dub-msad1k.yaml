@@ -1,0 +1,62 @@
+Region: eu-west-1
+Image:
+  Os: alinux2
+HeadNode:
+  InstanceType: c5.large
+  Networking:
+    SubnetId: subnet-0b16d88fce2535091
+  Ssh:
+    KeyName: mgiacomo
+  Iam:
+    AdditionalIamPolicies:
+      - Policy: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore # Required to report patching status
+    S3Access:
+      - BucketName: aws-parallelcluster-mgiacomo
+        EnableWriteAccess: false
+      - BucketName: aws-parallelcluster-mgiacomo
+        EnableWriteAccess: true
+        KeyName: experiments/scale-test/*
+  CustomActions:
+    OnNodeConfigured:
+      Script: s3://aws-parallelcluster-mgiacomo/scale-test/post.head.sh
+      Args:
+        - s3://aws-parallelcluster-mgiacomo/scale-test
+Scheduling:
+  Scheduler: slurm
+  SlurmQueues:
+    - Name: msad1k-1
+      ComputeResources:
+        - Name: msad1k-1-1
+          InstanceType: c5.xlarge
+          MinCount: 0
+          MaxCount: 2000
+      Networking:
+        SubnetIds:
+          - subnet-0cd5f52a072a7a502
+      Iam:
+        AdditionalIamPolicies:
+          - Policy: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore # Required to report patching status
+        S3Access:
+          - BucketName: aws-parallelcluster-mgiacomo
+            EnableWriteAccess: false
+      CustomActions:
+        OnNodeStart:
+          Script: s3://aws-parallelcluster-mgiacomo/scale-test/pre.compute.sh
+        OnNodeConfigured:
+          Script: s3://aws-parallelcluster-mgiacomo/scale-test/post.compute.sh
+SharedStorage:
+  - MountDir: /shared
+    Name: shared-ebs
+    StorageType: Ebs
+DirectoryService:
+  DomainName: DC=corp,DC=msad1,DC=pcluster
+  DomainAddr: ldap://10.0.18.30,ldap://10.0.32.28
+  PasswordSecretArn: arn:aws:secretsmanager:eu-west-1:319414405305:secret:ADSecretPassword-RIsyXg
+  DomainReadOnlyUser: CN=Admin,OU=Users,OU=CORP,DC=corp,DC=msad1,DC=pcluster
+  AdditionalSssdConfigs:
+    debug_level: "0x1ff"
+    ldap_auth_disable_tls_never_use_in_production: True
+
+DevSettings:
+  AmiSearchFilters:
+    Owner: self
