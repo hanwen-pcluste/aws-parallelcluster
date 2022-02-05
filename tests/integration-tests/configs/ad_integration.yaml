@@ -10,7 +10,7 @@ test-suites:
           schedulers: ["slurm"]
           benchmarks:
             - mpi_variants: ["openmpi"]
-              num_of_instances: [1500]
+              num_of_instances: [50]
               osu_benchmarks:
                 collective: ["osu_allreduce"]
                 pt2pt: []

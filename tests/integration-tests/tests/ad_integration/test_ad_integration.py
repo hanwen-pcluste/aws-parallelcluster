@@ -609,13 +609,7 @@ def test_ad_integration(
     users = []
     for user_num in range(1, NUM_USERS_TO_TEST + 1):
         users.append(ClusterUser(user_num, test_datadir, cluster, scheduler, remote_command_executor, ad_user_password))
-    for index in range(3):
-        run_benchmarks(users[0].remote_command_executor(), users[0].scheduler_commands(), diretory_type=directory_type)
-        cluster.stop()
-        wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=0)
-        cluster.start()
-        wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=2)
-        time.sleep(60)
+    run_benchmarks(remote_command_executor, scheduler_commands, diretory_type=directory_type)
     return
     _run_user_workloads(users, test_datadir, remote_command_executor)
     logging.info("Testing pcluster update and generate ssh keys for user")
@@ -718,13 +712,7 @@ def test_ad_integration_without_nss_with_enumerate(
     users = []
     for user_num in range(1, NUM_USERS_TO_TEST + 1):
         users.append(ClusterUser(user_num, test_datadir, cluster, scheduler, remote_command_executor, ad_user_password))
-    for index in range(3):
-        run_benchmarks(users[0].remote_command_executor(), users[0].scheduler_commands(), diretory_type=directory_type)
-        cluster.stop()
-        wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=0)
-        cluster.start()
-        wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=2)
-        time.sleep(60)
+    run_benchmarks(remote_command_executor, scheduler_commands, diretory_type=directory_type)
     return
 
 
@@ -797,13 +785,7 @@ def test_ad_integration_baseline(
     )
 
     scheduler_commands = get_scheduler_commands(scheduler, remote_command_executor)
-    for index in range(3):
-        run_benchmarks(remote_command_executor, scheduler_commands, diretory_type="baseline")
-        cluster.stop()
-        wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=0)
-        cluster.start()
-        wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=2)
-        time.sleep(60)
+    run_benchmarks(remote_command_executor, scheduler_commands, diretory_type="baseline")
     return
 
 
