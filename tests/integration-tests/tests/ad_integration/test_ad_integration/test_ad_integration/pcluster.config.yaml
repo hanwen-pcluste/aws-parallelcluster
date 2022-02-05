@@ -19,6 +19,8 @@ HeadNode:
         - s3://aws-parallelcluster-dev-hanwenli-scalingtest/scripts
 Scheduling:
   Scheduler: {{ scheduler }}
+  SlurmSettings:
+    ScaledownIdletime: 2
   SlurmQueues:
     - Name: compute
       ComputeResources:

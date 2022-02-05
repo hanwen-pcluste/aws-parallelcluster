@@ -58,11 +58,7 @@ echo "# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #"
 for iteration in $(seq 1 ${MAX_ITERATIONS}); do
   log "Executing iteration ${iteration}/${MAX_ITERATIONS}"
 
-  log "Terminating compute fleet"
-  terminate_compute_fleet ${CLUSTER_NAME} ${AWS_DEFAULT_REGION}
-
-  log "Waiting for compute fleet down to 0 nodes (can take up to the configured idle scale-down time, default 10 minutes)"
-  wait_compute_fleet ${CLUSTER_NAME} ${AWS_DEFAULT_REGION} 0 120
+  sleep 300
 
   # Job Launch
   JOB_ID=$(launch_job "${JOB_SCRIPT}" "${BENCHMARK_NAME}" "${NUM_PROCESSES}" "${JOB_USER}" "${OUTPUT_DIR}")
@@ -128,8 +124,6 @@ for iteration in $(seq 1 ${MAX_ITERATIONS}); do
   log "Iteration ${iteration}/${MAX_ITERATIONS} completed: job metrics in ${JOB_METRICS_FILE}"
   log "Waiting 60 seconds before the next iteration"
   sleep 60
-  log "Terminating compute fleet"
-  terminate_compute_fleet ${CLUSTER_NAME} ${AWS_DEFAULT_REGION}
 done
 
 # Samples
