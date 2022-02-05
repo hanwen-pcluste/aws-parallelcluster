@@ -136,7 +136,7 @@ done
 log "Generating samples"
 SAMPLES_FILE="${OUTPUT_DIR}/samples.json"
 JOBS_SAMPLE_FILES=$(find ${OUTPUT_DIR} -type f -name "job.*.sample.json")
-for metric in "jobRunTime" "jobWaitingTime" "jobWarmupLeaderNodeTime" "jobWarmupFirstNodeTime" "jobWarmupLastNodeTime" "osuLatencyMean"; do
+for metric in "jobRunTime" "jobWaitingTime" "jobWarmupLeaderNodeTime" "jobWarmupFirstNodeTime" "jobWarmupLastNodeTime"; do
   add_to_json "${metric}Sample" $(get_sample_from_json "${metric}" "${JOBS_SAMPLE_FILES}") ${SAMPLES_FILE}
 done
 COMPUTE_NODES_SAMPLE_FILES=$(find ${OUTPUT_DIR} -type f -name "compute-nodes.*.sample.json")
@@ -147,7 +147,7 @@ done
 # Statistics
 log "Generating statistics"
 STATISTICS_FILE="${OUTPUT_DIR}/statistics.json"
-for metric in "jobRunTime" "jobWaitingTime" "jobWarmupLeaderNodeTime" "jobWarmupFirstNodeTime" "jobWarmupLastNodeTime" "osuLatencyMean"; do
+for metric in "jobRunTime" "jobWaitingTime" "jobWarmupLeaderNodeTime" "jobWarmupFirstNodeTime" "jobWarmupLastNodeTime"; do
   add_to_json "${metric}.min" $(get_min "$(cat ${SAMPLES_FILE} | jq -r ".${metric}Sample")") ${STATISTICS_FILE}
   add_to_json "${metric}.max" $(get_max "$(cat ${SAMPLES_FILE} | jq -r ".${metric}Sample")") ${STATISTICS_FILE}
   add_to_json "${metric}.avg" $(get_avg "$(cat ${SAMPLES_FILE} | jq -r ".${metric}Sample")") ${STATISTICS_FILE}
