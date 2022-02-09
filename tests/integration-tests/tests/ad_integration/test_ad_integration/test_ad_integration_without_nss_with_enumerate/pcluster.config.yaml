@@ -1,7 +1,7 @@
 Image:
   Os: {{ os }}
 HeadNode:
-  InstanceType: {{ head_node_instance_type }}
+  InstanceType: c5n.18xlarge
   Networking:
     SubnetId: {{ public_subnet_id }}
   Ssh:
@@ -65,6 +65,10 @@ DirectoryService:
   GenerateSshKeysForUsers: false
   AdditionalSssdConfigs:
     debug_level: "0x1ff"
+    enumerate: true
     {% if directory_protocol == "ldap" %}
     ldap_auth_disable_tls_never_use_in_production: True
     {% endif %}
+DevSettings:
+  Cookbook:
+    ExtraChefAttributes: '{"cluster": {"enable_nss_slurm": "false"}}'

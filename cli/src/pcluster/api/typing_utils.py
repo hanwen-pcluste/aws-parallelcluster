@@ -25,6 +25,7 @@ if sys.version_info < (3, 7):
         """Determine whether klass is a List."""
         return klass.__extra__ == list
 
+
 else:
 
     def is_generic(klass):

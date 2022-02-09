@@ -14,6 +14,7 @@ import datetime
 import io
 import logging
 import os as os_lib
+import pathlib
 import random
 import string
 import time
@@ -33,6 +34,7 @@ from time_utils import seconds
 from utils import generate_stack_name
 
 from tests.ad_integration.cluster_user import ClusterUser
+from tests.common.assertions import wait_for_num_instances_in_cluster
 from tests.common.osu_common import compile_osu
 from tests.common.schedulers_common import get_scheduler_commands
 from tests.common.utils import get_sts_endpoint, retrieve_latest_ami
@@ -364,7 +366,6 @@ def directory_factory(request, cfn_stacks_factory, vpc_stacks, store_secret_in_s
         existing_directory_stack_name,
         existing_nlb_stack_name,
         directory_type,
-        test_resources_dir,
         region,
     ):
         if existing_directory_stack_name:
@@ -377,7 +378,7 @@ def directory_factory(request, cfn_stacks_factory, vpc_stacks, store_secret_in_s
             logging.info("Using directory stack named %s created by another test", directory_stack_name)
         else:
             directory_stack = _create_directory_stack(
-                cfn_stacks_factory, request, directory_type, test_resources_dir, region, vpc_stacks[region]
+                cfn_stacks_factory, request, directory_type, region, vpc_stacks[region]
             )
             directory_stack_name = directory_stack.name
             created_directory_stacks[region]["directory"] = directory_stack_name
@@ -399,7 +400,6 @@ def directory_factory(request, cfn_stacks_factory, vpc_stacks, store_secret_in_s
                 request,
                 directory_stack,
                 region,
-                test_resources_dir,
                 certificate_arn,
                 certificate_secret_arn,
                 common_name,
@@ -614,6 +614,8 @@ def test_ad_integration(
     users = []
     for user_num in range(1, NUM_USERS_TO_TEST + 1):
         users.append(ClusterUser(user_num, test_datadir, cluster, scheduler, remote_command_executor, ad_user_password))
+    run_benchmarks(remote_command_executor, scheduler_commands, diretory_type=directory_type)
+    return
     _run_user_workloads(users, test_datadir, remote_command_executor)
     logging.info("Testing pcluster update and generate ssh keys for user")
     _check_ssh_key_generation(users[0], scheduler_commands, False)
@@ -628,7 +630,166 @@ def test_ad_integration(
     for user in users:
         logging.info(f"Checking SSH access for user {user.alias}")
         _check_ssh_auth(user=user, expect_success=user.alias != "PclusterUser3")
-    run_benchmarks(users[0].remote_command_executor(), users[0].scheduler_commands())
+    run_benchmarks(users[0].remote_command_executor(), users[0].scheduler_commands(), diretory_type=directory_type)
+
+
+@pytest.mark.parametrize(
+    "directory_type,directory_protocol,directory_certificate_verification",
+    [
+        ("SimpleAD", "ldap", False),
+        ("MicrosoftAD", "ldap", False),
+    ],
+)
+def test_ad_integration_without_nss_with_enumerate(
+    region,
+    scheduler,
+    pcluster_config_reader,
+    directory_type,
+    directory_protocol,
+    directory_certificate_verification,
+    test_datadir,
+    s3_bucket_factory,
+    directory_factory,
+    request,
+    store_secret_in_secret_manager,
+    clusters_factory,
+    run_benchmarks,
+):
+    """Verify AD integration works as expected."""
+    compute_instance_type_info = {"name": "c5.xlarge", "num_cores": 4}
+    config_params = {"compute_instance_type": compute_instance_type_info.get("name")}
+    directory_stack_name, nlb_stack_name = directory_factory(
+        request.config.getoption("directory_stack_name"),
+        request.config.getoption("ldaps_nlb_stack_name"),
+        directory_type,
+        region,
+    )
+    directory_stack_outputs = get_infra_stack_outputs(directory_stack_name)
+    ad_user_password = directory_stack_outputs.get("UserPassword")
+    password_secret_arn = store_secret_in_secret_manager(
+        region, secret_string=directory_stack_outputs.get("AdminPassword")
+    )
+    nlb_stack_parameters = get_infra_stack_parameters(nlb_stack_name)
+    ldap_tls_ca_cert = "/opt/parallelcluster/shared/directory_service/certificate.crt"
+    config_params.update(
+        get_ad_config_param_vals(
+            directory_stack_outputs,
+            nlb_stack_parameters,
+            password_secret_arn,
+            ldap_tls_ca_cert,
+            directory_type,
+            directory_protocol,
+            directory_certificate_verification,
+        )
+    )
+    cluster_config = pcluster_config_reader(**config_params)
+    cluster = clusters_factory(cluster_config)
+
+    certificate_secret_arn = nlb_stack_parameters.get("CertificateSecretArn")
+    certificate = boto3.client("secretsmanager").get_secret_value(SecretId=certificate_secret_arn)["SecretBinary"]
+    with open(test_datadir / "certificate.crt", "wb") as f:
+        f.write(certificate)
+
+    # Publish compute node count metric every minute via cron job
+    # TODO: use metrics reporter from the benchmarks module
+    remote_command_executor = RemoteCommandExecutor(cluster)
+    remote_command_executor.run_remote_command(
+        f"sudo cp certificate.crt {ldap_tls_ca_cert} && sudo service sssd restart",
+        additional_files=[test_datadir / "certificate.crt"],
+    )
+    if directory_certificate_verification:
+        logging.info("Sleeping 10 minutes to wait for the SSSD agent use the certificate.")
+        time.sleep(600)
+        # TODO: we have to sleep for 10 minutes to wait for the SSSD agent use the newly placed certificate.
+        #  We should look for other methods to let the SSSD agent use the new certificate more quickly
+    remote_command_executor = RemoteCommandExecutor(cluster)
+    metric_publisher_script = "publish_compute_node_count_metric.sh"
+    remote_metric_publisher_script_path = f"/shared/{metric_publisher_script}"
+    crontab_expression = f"* * * * * {remote_metric_publisher_script_path} &> {remote_metric_publisher_script_path}.log"
+    remote_command_executor.run_remote_command(
+        f"echo '{crontab_expression}' | crontab -",
+        additional_files={str(test_datadir / metric_publisher_script): remote_metric_publisher_script_path},
+    )
+
+    scheduler_commands = get_scheduler_commands(scheduler, remote_command_executor)
+    assert_that(NUM_USERS_TO_TEST).is_less_than_or_equal_to(NUM_USERS_TO_CREATE)
+    users = []
+    for user_num in range(1, NUM_USERS_TO_TEST + 1):
+        users.append(ClusterUser(user_num, test_datadir, cluster, scheduler, remote_command_executor, ad_user_password))
+    run_benchmarks(remote_command_executor, scheduler_commands, diretory_type=directory_type)
+    return
+
+
+@pytest.mark.parametrize(
+    "directory_type,directory_protocol,directory_certificate_verification",
+    [
+        ("SimpleAD", "ldap", False),
+        ("MicrosoftAD", "ldap", False),
+    ],
+)
+def test_ad_integration_baseline(
+    region,
+    scheduler,
+    pcluster_config_reader,
+    directory_type,
+    directory_protocol,
+    directory_certificate_verification,
+    test_datadir,
+    s3_bucket_factory,
+    directory_factory,
+    request,
+    store_secret_in_secret_manager,
+    clusters_factory,
+    run_benchmarks,
+):
+    """Verify AD integration works as expected."""
+    compute_instance_type_info = {"name": "c5.xlarge", "num_cores": 4}
+    config_params = {"compute_instance_type": compute_instance_type_info.get("name")}
+    directory_stack_name, nlb_stack_name = directory_factory(
+        request.config.getoption("directory_stack_name"),
+        request.config.getoption("ldaps_nlb_stack_name"),
+        directory_type,
+        region,
+    )
+    directory_stack_outputs = get_infra_stack_outputs(directory_stack_name)
+    password_secret_arn = store_secret_in_secret_manager(
+        region, secret_string=directory_stack_outputs.get("AdminPassword")
+    )
+    nlb_stack_parameters = get_infra_stack_parameters(nlb_stack_name)
+    ldap_tls_ca_cert = "/opt/parallelcluster/shared/directory_service/certificate.crt"
+    config_params.update(
+        get_ad_config_param_vals(
+            directory_stack_outputs,
+            nlb_stack_parameters,
+            password_secret_arn,
+            ldap_tls_ca_cert,
+            directory_type,
+            directory_protocol,
+            directory_certificate_verification,
+        )
+    )
+    cluster_config = pcluster_config_reader(**config_params)
+    cluster = clusters_factory(cluster_config)
+
+    certificate_secret_arn = nlb_stack_parameters.get("CertificateSecretArn")
+    certificate = boto3.client("secretsmanager").get_secret_value(SecretId=certificate_secret_arn)["SecretBinary"]
+    with open(test_datadir / "certificate.crt", "wb") as f:
+        f.write(certificate)
+
+    # Publish compute node count metric every minute via cron job
+    # TODO: use metrics reporter from the benchmarks module
+    remote_command_executor = RemoteCommandExecutor(cluster)
+    metric_publisher_script = "publish_compute_node_count_metric.sh"
+    remote_metric_publisher_script_path = f"/shared/{metric_publisher_script}"
+    crontab_expression = f"* * * * * {remote_metric_publisher_script_path} &> {remote_metric_publisher_script_path}.log"
+    remote_command_executor.run_remote_command(
+        f"echo '{crontab_expression}' | crontab -",
+        additional_files={str(test_datadir / metric_publisher_script): remote_metric_publisher_script_path},
+    )
+
+    scheduler_commands = get_scheduler_commands(scheduler, remote_command_executor)
+    run_benchmarks(remote_command_executor, scheduler_commands, diretory_type="baseline")
+    return
 
 
 def _check_ssh_auth(user, expect_success=True):
