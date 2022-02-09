@@ -178,7 +178,7 @@ def store_secret_in_secret_manager(request, cfn_stacks_factory):
                 secrets_manager_client.delete_secret(SecretId=secret_arn)
 
 
-def _create_directory_stack(cfn_stacks_factory, request, directory_type, test_resources_dir, region, vpc_stack):
+def _create_directory_stack(cfn_stacks_factory, request, directory_type, region, vpc_stack):
     directory_stack_name = generate_stack_name(
         f"integ-tests-MultiUserInfraStack{directory_type}", request.config.getoption("stackname_suffix")
     )
@@ -186,7 +186,7 @@ def _create_directory_stack(cfn_stacks_factory, request, directory_type, test_re
     if directory_type not in ("MicrosoftAD", "SimpleAD"):
         raise Exception(f"Unknown directory type: {directory_type}")
 
-    directory_stack_template_path = os_lib.path.join(test_resources_dir, "ad_stack.yaml")
+    directory_stack_template_path = pathlib.Path(__file__).parent.parent / "test_ad_integration/ad_stack.yaml"
     account_id = (
         boto3.client("sts", region_name=region, endpoint_url=get_sts_endpoint(region))
         .get_caller_identity()
@@ -271,12 +271,11 @@ def _create_nlb_stack(
     request,
     directory_stack,
     region,
-    test_resources_dir,
     certificate_arn,
     certificate_secret_arn,
     domain_name,
 ):
-    nlb_stack_template_path = os_lib.path.join(test_resources_dir, "NLB_SimpleAD.yaml")
+    nlb_stack_template_path = pathlib.Path(__file__).parent.parent / "test_ad_integration/NLB_SimpleAD.yaml"
     nlb_stack_name = generate_stack_name(
         "integ-tests-MultiUserInfraStackNLB", request.config.getoption("stackname_suffix")
     )
@@ -551,13 +550,16 @@ def test_ad_integration(
     run_benchmarks,
 ):
     """Verify AD integration works as expected."""
+    head_node_instance_type = "c5n.18xlarge" if request.config.getoption("benchmarks") else "c5.xlarge"
     compute_instance_type_info = {"name": "c5.xlarge", "num_cores": 4}
-    config_params = {"compute_instance_type": compute_instance_type_info.get("name")}
+    config_params = {
+        "compute_instance_type": compute_instance_type_info.get("name"),
+        "head_node_instance_type": head_node_instance_type,
+    }
     directory_stack_name, nlb_stack_name = directory_factory(
         request.config.getoption("directory_stack_name"),
         request.config.getoption("ldaps_nlb_stack_name"),
         directory_type,
-        str(test_datadir),
         region,
     )
     directory_stack_outputs = get_infra_stack_outputs(directory_stack_name)
