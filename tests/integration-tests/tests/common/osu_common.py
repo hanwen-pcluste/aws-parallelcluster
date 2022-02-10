@@ -10,12 +10,11 @@
 # This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied.
 # See the License for the specific language governing permissions and limitations under the License.
 import logging
-import os as os_lib
 import pathlib
 from shutil import copyfile
 
 from constants import OSU_BENCHMARK_VERSION
-from jinja2 import Environment, FileSystemLoader
+from utils import render_jinja_template
 
 OSU_COMMON_DATADIR = pathlib.Path(__file__).parent / "data/osu/"
 SUPPORTED_MPIS = ["openmpi", "intelmpi"]
@@ -101,13 +100,3 @@ def run_osu_benchmarks(
 
     output = remote_command_executor.run_remote_command(f"cat /shared/{benchmark_name}.out").stdout
     return output
-
-
-def render_jinja_template(template_file_path, **kwargs):
-    file_loader = FileSystemLoader(str(os_lib.path.dirname(template_file_path)))
-    env = Environment(loader=file_loader)
-    rendered_template = env.get_template(os_lib.path.basename(template_file_path)).render(**kwargs)
-    logging.info("Writing the following to %s\n%s", template_file_path, rendered_template)
-    with open(template_file_path, "w", encoding="utf-8") as f:
-        f.write(rendered_template)
-    return template_file_path

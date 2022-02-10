@@ -8,6 +8,17 @@ HeadNode:
     KeyName: {{ key_name }}
   Imds:
     Secured: {{ imds_secured }}
+{% if run_scripts %}
+  Iam:
+    S3Access:
+      - BucketName: {{ bucket_name }}
+        EnableWriteAccess: true
+  CustomActions:
+    OnNodeConfigured:
+      Script: s3://{{ bucket_name }}/scripts/post.head.sh
+      Args:
+        - s3://{{ bucket_name }}/scripts
+{% endif %}
 Scheduling:
   Scheduler: {{ scheduler }}
   SlurmQueues:
@@ -20,6 +31,17 @@ Scheduling:
       Networking:
         SubnetIds:
           - {{ private_subnet_id }}
+    {% if run_scripts %}
+      Iam:
+        S3Access:
+          - BucketName: {{ bucket_name }}
+            EnableWriteAccess: false
+      CustomActions:
+        OnNodeStart:
+          Script: s3://{{ bucket_name }}/scripts/pre.compute.sh
+        OnNodeConfigured:
+          Script: s3://{{ bucket_name }}/scripts/post.compute.sh
+    {% endif %}
 Monitoring:
   Logs:
     CloudWatch:

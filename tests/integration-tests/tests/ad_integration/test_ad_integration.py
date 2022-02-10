@@ -14,6 +14,7 @@ import datetime
 import io
 import logging
 import os as os_lib
+import pathlib
 import random
 import string
 import time
@@ -24,13 +25,12 @@ import boto3
 import pytest
 from assertpy import assert_that
 from cfn_stacks_factory import CfnStack
-from jinja2 import Environment, FileSystemLoader
 from OpenSSL import crypto
 from OpenSSL.crypto import FILETYPE_PEM, TYPE_RSA, X509, dump_certificate, dump_privatekey
 from remote_command_executor import RemoteCommandExecutor
 from retrying import retry
 from time_utils import seconds
-from utils import generate_stack_name
+from utils import generate_stack_name, render_jinja_template
 
 from tests.ad_integration.cluster_user import ClusterUser
 from tests.common.osu_common import compile_osu
@@ -98,17 +98,6 @@ def get_ad_config_param_vals(
         "directory_protocol": directory_protocol,
         "ldap_tls_req_cert": "never" if directory_certificate_verification is False else "hard",
     }
-
-
-# TODO: move this to a common place, since it's a copy of code from osu_common.py
-def render_jinja_template(template_file_path, **kwargs):
-    file_loader = FileSystemLoader(str(os_lib.path.dirname(template_file_path)))
-    env = Environment(loader=file_loader)
-    rendered_template = env.get_template(os_lib.path.basename(template_file_path)).render(**kwargs)
-    logging.info("Writing the following to %s\n%s", template_file_path, rendered_template)
-    with open(template_file_path, "w", encoding="utf-8") as f:
-        f.write(rendered_template)
-    return template_file_path
 
 
 def _add_file_to_zip(zip_file, path, arcname):
@@ -553,9 +542,11 @@ def test_ad_integration(
     """Verify AD integration works as expected."""
     head_node_instance_type = "c5n.18xlarge" if request.config.getoption("benchmarks") else "c5.xlarge"
     compute_instance_type_info = {"name": "c5.xlarge", "num_cores": 4}
+    run_scripts = False
     config_params = {
         "compute_instance_type": compute_instance_type_info.get("name"),
         "head_node_instance_type": head_node_instance_type,
+        "run_scripts": run_scripts,
     }
     directory_stack_name, nlb_stack_name = directory_factory(
         request.config.getoption("directory_stack_name"),
@@ -582,6 +573,11 @@ def test_ad_integration(
             directory_certificate_verification,
         )
     )
+    if run_scripts:
+        bucket_name = s3_bucket_factory()
+        bootstrap_scripts_dir = pathlib.Path(__file__).parent.parent.parent.parent / "scale-testing/bootstrap-scripts/"
+        _upload_all_files(bucket_name, bootstrap_scripts_dir)
+        config_params["bucket_name"] = bucket_name
     cluster_config = pcluster_config_reader(**config_params)
     cluster = clusters_factory(cluster_config)
 
@@ -630,7 +626,12 @@ def test_ad_integration(
     for user in users:
         logging.info(f"Checking SSH access for user {user.alias}")
         _check_ssh_auth(user=user, expect_success=user.alias != "PclusterUser3")
-    run_benchmarks(users[0].remote_command_executor(), users[0].scheduler_commands(), diretory_type=directory_type)
+    run_benchmarks(
+        users[0].remote_command_executor(),
+        users[0].scheduler_commands(),
+        run_scipts=run_scripts,
+        diretory_type=directory_type,
+    )
 
 
 def _check_ssh_auth(user, expect_success=True):
@@ -642,3 +643,11 @@ def _check_ssh_auth(user, expect_success=True):
             raise e
         else:
             logging.info(f"SSH access denied for user {user.alias}, as expected")
+
+
+def _upload_all_files(bucket_name, scripts_dir):
+    bucket = boto3.resource("s3").Bucket(bucket_name)
+    directory = os_lib.fsencode(scripts_dir)
+    for file in os_lib.listdir(directory):
+        filename = os_lib.fsdecode(file)
+        bucket.upload_file(str(scripts_dir / filename), f"scripts/{filename}")

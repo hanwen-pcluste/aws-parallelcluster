@@ -16,6 +16,7 @@
 import json
 import logging
 import os
+import pathlib
 import random
 import re
 import time
@@ -60,6 +61,7 @@ from utils import (
     get_network_interfaces_count,
     get_vpc_snakecase_value,
     random_alphanumeric,
+    render_jinja_template,
     set_logger_formatter,
 )
 
@@ -1206,7 +1208,7 @@ def to_pascal_case(snake_case_word):
 
 @pytest.fixture()
 def run_benchmarks(request, mpi_variants, test_datadir, instance, os, region, benchmarks):
-    def _run_benchmars(remote_command_executor, scheduler_commands, **kwargs):
+    def _run_benchmars(remote_command_executor, scheduler_commands, run_scripts=False, **kwargs):
         function_name = request.function.__name__
         if not request.config.getoption("benchmarks"):
             logging.info("Skipped benchmarks for %s", function_name)
@@ -1217,99 +1219,118 @@ def run_benchmarks(request, mpi_variants, test_datadir, instance, os, region, be
             for mpi_variant, num_of_instances in product(
                 benchmark.get("mpi_variants"), benchmark.get("num_of_instances")
             ):
-                _run_basic_benchmarks(
-                    benchmark,
-                    cloudwatch_client,
-                    function_name,
-                    kwargs,
-                    mpi_variant,
-                    num_of_instances,
-                    remote_command_executor,
-                    scheduler_commands,
-                )
+                if run_scripts:
+                    bootstrap_scripts_dir = pathlib.Path(__file__).parent.parent / "scale-testing/bootstrap-scripts/"
+                    remote_command_executor.run_remote_script(str(bootstrap_scripts_dir / "init-osu.sh"))
+                    config_args = {"name": function_name, "num_nodes": num_of_instances, **kwargs}
+                    launch_entrypoint_path = str(bootstrap_scripts_dir / "launch-entrypoint.sh")
+                    render_jinja_template(launch_entrypoint_path, **config_args)
+                    remote_command_executor.run_remote_script(launch_entrypoint_path)
+                else:
+                    _run_basic_benchmarks(
+                        request,
+                        instance,
+                        region,
+                        os,
+                        test_datadir,
+                        benchmark,
+                        cloudwatch_client,
+                        function_name,
+                        kwargs,
+                        mpi_variant,
+                        num_of_instances,
+                        remote_command_executor,
+                        scheduler_commands,
+                    )
         logging.info("Finished benchmarks for %s", function_name)
 
-    def _run_basic_benchmarks(
-        benchmark,
-        cloudwatch_client,
-        function_name,
-        kwargs,
-        mpi_variant,
-        num_of_instances,
-        remote_command_executor,
-        scheduler_commands,
-    ):
-        partition = benchmark.get("partition")
-        metric_namespace = f"ParallelCluster/{request.function.__name__}"
-        dimensions = {
-            "MpiVariant": mpi_variant,
-            "NumOfInstances": num_of_instances,
-            "Instance": instance,
-            "Os": os,
-            "Partition": partition,
-        }
-        for key, value in kwargs.items():
-            dimensions[to_pascal_case(key)] = value
-        result = scheduler_commands.submit_command("srun id", nodes=num_of_instances, partition=partition)
-        job_id = scheduler_commands.assert_job_submitted(result.stdout)
-        start = time.time()
-        scheduler_commands.wait_job_running(job_id)
-        end = time.time()
-        metric_data = [
-            (
-                {
-                    "MetricName": "JobStartTime",
-                    "Dimensions": [{"Name": name, "Value": str(value)} for name, value in dimensions.items()],
-                    "Value": end - start,
-                    "Unit": "Seconds",
-                }
-            )
-        ]
-        cloudwatch_client.put_metric_data(
-            Namespace=metric_namespace,
-            MetricData=metric_data,
-        )
-        scheduler_commands.wait_job_completed(job_id)
-        osu_benchmarks = benchmark.get("osu_benchmarks", [])
-        if osu_benchmarks:
-            for osu_benchmark_group, osu_benchmark_names in osu_benchmarks.items():
-                for osu_benchmark_name in osu_benchmark_names:
-                    logging.info("Running benchmarks %s for %s", osu_benchmark_name, function_name)
-                    output = run_osu_benchmarks(
-                        mpi_version=mpi_variant,
-                        benchmark_group=osu_benchmark_group,
-                        benchmark_name=osu_benchmark_name,
-                        partition=benchmark.get("partition"),
-                        remote_command_executor=remote_command_executor,
-                        scheduler_commands=scheduler_commands,
-                        num_of_instances=num_of_instances,
-                        slots_per_instance=fetch_instance_slots(region, instance),
-                        test_datadir=test_datadir,
-                        timeout=40,
-                    )
-                    logging.info("Pushing benchmarks %s metrics for %s", osu_benchmark_name, function_name)
-                    metric_data = []
-                    for packet_size, latency in re.findall(r"(\d+)\s+(\d+)\.", output):
-                        dimensions.update(
-                            {
-                                "OsuBenchmarkGroup": osu_benchmark_group,
-                                "OsuBenchmarkName": osu_benchmark_name,
-                                "PacketSize": packet_size,
-                            }
-                        )
-                        metric_data.append(
-                            {
-                                "MetricName": "Latency",
-                                "Dimensions": [
-                                    {"Name": name, "Value": str(value)} for name, value in dimensions.items()
-                                ],
-                                "Value": int(latency),
-                                "Unit": "Microseconds",
-                            }
-                        )
-                    cloudwatch_client.put_metric_data(
-                        Namespace=metric_namespace,
-                        MetricData=metric_data,
-                    )
-
     yield _run_benchmars
+
+
+def _run_basic_benchmarks(
+    request,
+    instance,
+    region,
+    os,
+    test_datadir,
+    benchmark,
+    cloudwatch_client,
+    function_name,
+    kwargs,
+    mpi_variant,
+    num_of_instances,
+    remote_command_executor,
+    scheduler_commands,
+):
+    partition = benchmark.get("partition")
+    metric_namespace = f"ParallelCluster/{request.function.__name__}"
+    dimensions = {
+        "MpiVariant": mpi_variant,
+        "NumOfInstances": num_of_instances,
+        "Instance": instance,
+        "Os": os,
+        "Partition": partition,
+    }
+    for key, value in kwargs.items():
+        dimensions[to_pascal_case(key)] = value
+    result = scheduler_commands.submit_command("srun id", nodes=num_of_instances, partition=partition)
+    job_id = scheduler_commands.assert_job_submitted(result.stdout)
+    start = time.time()
+    scheduler_commands.wait_job_completed(job_id)
+    end = time.time()
+    metric_data = [
+        (
+            {
+                "MetricName": "JobStartTime",
+                "Dimensions": [{"Name": name, "Value": str(value)} for name, value in dimensions.items()],
+                "Value": end - start,
+                "Unit": "Seconds",
+            }
+        )
+    ]
+    cloudwatch_client.put_metric_data(
+        Namespace=metric_namespace,
+        MetricData=metric_data,
+    )
+    scheduler_commands.wait_job_completed(job_id)
+    osu_benchmarks = benchmark.get("osu_benchmarks", [])
+    if osu_benchmarks:
+        for osu_benchmark_group, osu_benchmark_names in osu_benchmarks.items():
+            if osu_benchmark_group == "pt2pt":
+                num_of_instances = 2  # point to point benchmark is only meaningful with two nodes
+            for osu_benchmark_name in osu_benchmark_names:
+                logging.info("Running benchmarks %s for %s", osu_benchmark_name, function_name)
+                output = run_osu_benchmarks(
+                    mpi_version=mpi_variant,
+                    benchmark_group=osu_benchmark_group,
+                    benchmark_name=osu_benchmark_name,
+                    partition=benchmark.get("partition"),
+                    remote_command_executor=remote_command_executor,
+                    scheduler_commands=scheduler_commands,
+                    num_of_instances=num_of_instances,
+                    slots_per_instance=fetch_instance_slots(region, instance),
+                    test_datadir=test_datadir,
+                    timeout=40,
+                )
+                logging.info("Pushing benchmarks %s metrics for %s", osu_benchmark_name, function_name)
+                metric_data = []
+                for packet_size, latency in re.findall(r"(\d+)\s+(\d+)\.", output):
+                    dimensions.update(
+                        {
+                            "OsuBenchmarkGroup": osu_benchmark_group,
+                            "OsuBenchmarkName": osu_benchmark_name,
+                            "PacketSize": packet_size,
+                        }
+                    )
+                    metric_data.append(
+                        {
+                            "MetricName": "Latency",
+                            "Dimensions": [{"Name": name, "Value": str(value)} for name, value in dimensions.items()],
+                            "Value": int(latency),
+                            "Unit": "Microseconds",
+                        }
+                    )
+                cloudwatch_client.put_metric_data(
+                    Namespace=metric_namespace,
+                    MetricData=metric_data,
+                )
