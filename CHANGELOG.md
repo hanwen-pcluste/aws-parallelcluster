@@ -4,6 +4,9 @@ CHANGELOG
 x.x.x
 ------
 
+**ENHANCEMENTS**
+- Add support for up to 10 Elastic File Systems.
+
 **BUG FIXES**
 - Fix cluster stack in `DELETE_FAILED` when deleting a cluster, due to Route53 hosted zone not empty.
 - Fix build-image stack in `DELETE_FAILED` after image built successful, due to new EC2ImageBuilder policies.
