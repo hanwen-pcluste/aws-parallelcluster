@@ -420,7 +420,7 @@ def inject_additional_config_settings(cluster_config, request, region):
         "post_install",
     ]:
         if request.config.getoption(custom_option) and custom_option not in config[cluster_template]:
-            config[cluster_template][custom_option] = request.config.getoption(custom_option)
+            config[cluster_template][custom_option] = request.config.getoption(custom_option).replace("%", "%%")
             if custom_option in ["pre_install", "post_install"]:
                 _add_policy_for_pre_post_install(cluster_template, config, custom_option, request, region)
 
