@@ -48,3 +48,24 @@ SharedStorage:
   - MountDir: {{ new_efs_mount_dirs[2] }}
     Name: efs5
     StorageType: Efs
+  - MountDir: {{ new_efs_mount_dirs[3]}}
+    Name: efs6
+    StorageType: Efs
+  - MountDir: {{ new_efs_mount_dirs[4]}}
+    Name: efs7
+    StorageType: Efs
+  - MountDir: {{ new_efs_mount_dirs[5] }}
+    Name: efs8
+    StorageType: Efs
+  - MountDir: {{ new_efs_mount_dirs[6] }}
+    Name: efs9
+    StorageType: Efs
+  - MountDir: {{ new_efs_mount_dirs[7] }}
+    Name: efs10
+    StorageType: Efs
+  - MountDir: {{ new_efs_mount_dirs[8] }}
+    Name: efs11
+    StorageType: Efs
+  - MountDir: {{ new_efs_mount_dirs[9] }}
+    Name: efs12
+    StorageType: Efs
