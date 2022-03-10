@@ -93,7 +93,7 @@ def test_existing_efs(
         existing_efs_mount_dirs.append(f"/existing_efs_mount_dir_{i}")
 
     new_efs_mount_dirs = []
-    num_new_efs = 10
+    num_new_efs = 5
     for i in range(num_new_efs):
         new_efs_mount_dirs.append(f"/new_efs_mount_dir_{i}")
 
