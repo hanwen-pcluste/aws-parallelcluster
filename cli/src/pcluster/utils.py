@@ -1076,7 +1076,15 @@ def read_remote_file(url):
         if urlparse(url).scheme == "s3":
             match = re.match(r"s3://(.*?)/(.*)", url)
             bucket, key = match.group(1), match.group(2)
-            file_contents = boto3.resource("s3").Object(bucket, key).get()["Body"].read().decode("utf-8")
+            try:
+                file_contents = boto3.resource("s3", region_name="us-east-1").Object(bucket, key).get()["Body"].read().decode("utf-8")
+            except ClientError as e:
+                error = e.response.get["Error"]
+                if error["Code"] == "IllegalLocationConstraintException":
+                    match = re.match(r"The (.*) location constraint", error["Message"])
+                    file_contents = boto3.resource("s3", region_name=match.group(1)).Object(bucket, key).get()["Body"].read().decode("utf-8")
+                else:
+                    raise e
         else:
             with urllib.request.urlopen(url) as f:  # nosec nosemgrep
                 file_contents = f.read().decode("utf-8")
