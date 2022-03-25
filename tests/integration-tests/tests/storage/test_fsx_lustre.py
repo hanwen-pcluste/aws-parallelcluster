@@ -264,6 +264,7 @@ def test_multiple_fsx(
     clusters_factory,
     scheduler_commands_factory,
     test_datadir,
+    request,
 ):
     """
     Test existing Fsx file system
@@ -281,22 +282,42 @@ def test_multiple_fsx(
     for i in range(num_all_fsx):
         mount_dirs.append(f"/fsx_mount_dir{i}")
     num_existing_fsx = 2
+    '''
     existing_fsx_fs_ids = []
-    for _ in range(num_existing_fsx):
-        existing_fsx_fs_ids.append(
-            fsx_factory(
-                title="existingfsx",
-                FileSystemType="LUSTRE",
-                StorageCapacity=1200,
-                LustreConfiguration=LustreConfiguration(
-                    title="lustreConfiguration", ImportPath=import_path, ExportPath=export_path
-                ),
-            )
+    existing_fsx_fs_ids.extend(
+        fsx_factory(
+            num=num_existing_fsx,
+            FileSystemType="LUSTRE",
+            StorageCapacity=1200,
+            LustreConfiguration=LustreConfiguration(
+                title="lustreConfiguration", ImportPath=import_path, ExportPath=export_path
+            ),
         )
+    )
+    '''
+    existing_fsx_fs_ids = ["fs-02b656cf9dd25ee09", "fs-0aaad6a2296979aaa"]
+    scaling_fsx_fs_ids = []
+    scaling_mount_dirs = []
+    if request.config.getoption("benchmarks"):
+        num_scaling_fsx = 50 - num_existing_fsx
+        scaling_fsx_fs_ids = fsx_factory(
+            num=num_scaling_fsx,
+            FileSystemType="LUSTRE",
+            StorageCapacity=1200,
+            LustreConfiguration=LustreConfiguration(
+                title="lustreConfiguration", ImportPath=import_path, ExportPath=export_path
+            ),
+        )
+        for i in range(num_scaling_fsx):
+            scaling_mount_dirs.append(f"/fsx_scaling_mount_dir{i}")
+        mount_dirs.extend(scaling_mount_dirs)
+
     cluster_config = pcluster_config_reader(
         bucket_name=bucket_name,
         mount_dirs=mount_dirs,
         existing_fsx_fs_ids=existing_fsx_fs_ids,
+        scaling_fsx_fs_ids=scaling_fsx_fs_ids,
+        scaling_mount_dirs=scaling_mount_dirs,
     )
     cluster = clusters_factory(cluster_config)
 
@@ -312,7 +333,7 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
     """
     created_stacks = []
 
-    def _fsx_factory(**kwargs):
+    def _fsx_factory(num=1, **kwargs):
         # FSx stack
         fsx_template = Template()
         fsx_template.set_version()
@@ -333,12 +354,15 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
             ],
             VpcId=vpc_stack.cfn_outputs["VpcId"],
         )
-
-        fsx_filesystem = FileSystem(
-            SecurityGroupIds=[Ref(fsx_sg)], SubnetIds=[vpc_stack.cfn_outputs["PublicSubnetId"]], **kwargs
-        )
         fsx_template.add_resource(fsx_sg)
-        fsx_template.add_resource(fsx_filesystem)
+        for i in range(num):
+            depends_on_arg = {}
+            if i >= 15:
+                depends_on_arg = {"DependsOn": [f"existingFSx{i-15}"]}
+            fsx_filesystem = FileSystem(
+                title=f"existingFSx{i}", SecurityGroupIds=[Ref(fsx_sg)], SubnetIds=[vpc_stack.cfn_outputs["PublicSubnetId"]], **kwargs, **depends_on_arg
+            )
+            fsx_template.add_resource(fsx_filesystem)
         fsx_stack = CfnStack(
             name=utils.generate_stack_name("integ-tests-fsx", request.config.getoption("stackname_suffix")),
             region=region,
@@ -347,7 +371,11 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
         cfn_stacks_factory.create_stack(fsx_stack)
         created_stacks.append(fsx_stack)
 
-        return fsx_stack.cfn_resources[kwargs.get("title")]
+        result = []
+        for resource in utils.get_cfn_resources(fsx_stack.name, region):
+            if resource["ResourceType"] == "AWS::FSx::FileSystem":
+                result.append(resource["PhysicalResourceId"])
+        return result
 
     yield _fsx_factory
 

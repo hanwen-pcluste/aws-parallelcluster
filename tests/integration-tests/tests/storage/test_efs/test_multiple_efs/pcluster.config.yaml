@@ -42,9 +42,3 @@ SharedStorage:
     StorageType: Efs
     EfsSettings:
       FileSystemId: {{ existing_efss[1] }}
-  - MountDir: {{ new_efs_mount_dirs[1] }}
-    Name: efs4
-    StorageType: Efs
-  - MountDir: {{ new_efs_mount_dirs[2] }}
-    Name: efs5
-    StorageType: Efs
