@@ -56,8 +56,8 @@ SharedStorage:
     FsxLustreSettings:
       FileSystemId: {{ existing_fsx_fs_ids[1] }}
   {% for fsx_fs_id in scaling_fsx_fs_ids %}
-  - MountDir: {{ scaling_mount_dirs[loop.index] }}
-    Name: scalingfsx{{ loop.index }}
+  - MountDir: {{ scaling_mount_dirs[loop.index-1] }}
+    Name: scalingfsx{{ loop.index-1 }}
     StorageType: FsxLustre
     FsxLustreSettings:
       FileSystemId: {{ fsx_fs_id }}

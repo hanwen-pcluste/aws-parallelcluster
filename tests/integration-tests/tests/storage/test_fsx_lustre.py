@@ -282,7 +282,7 @@ def test_multiple_fsx(
     for i in range(num_all_fsx):
         mount_dirs.append(f"/fsx_mount_dir{i}")
     num_existing_fsx = 2
-    '''
+    """
     existing_fsx_fs_ids = []
     existing_fsx_fs_ids.extend(
         fsx_factory(
@@ -294,7 +294,7 @@ def test_multiple_fsx(
             ),
         )
     )
-    '''
+    """
     existing_fsx_fs_ids = ["fs-02b656cf9dd25ee09", "fs-0aaad6a2296979aaa"]
     scaling_fsx_fs_ids = []
     scaling_mount_dirs = []
@@ -334,6 +334,7 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
     created_stacks = []
 
     def _fsx_factory(num=1, **kwargs):
+        """
         # FSx stack
         fsx_template = Template()
         fsx_template.set_version()
@@ -355,12 +356,13 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
             VpcId=vpc_stack.cfn_outputs["VpcId"],
         )
         fsx_template.add_resource(fsx_sg)
+        file_system_resource_name = "FileSystemResource"
         for i in range(num):
             depends_on_arg = {}
             if i >= 15:
                 depends_on_arg = {"DependsOn": [f"existingFSx{i-15}"]}
             fsx_filesystem = FileSystem(
-                title=f"existingFSx{i}", SecurityGroupIds=[Ref(fsx_sg)], SubnetIds=[vpc_stack.cfn_outputs["PublicSubnetId"]], **kwargs, **depends_on_arg
+                title=f"{file_system_resource_name}{i}", SecurityGroupIds=[Ref(fsx_sg)], SubnetIds=[vpc_stack.cfn_outputs["PublicSubnetId"]], **kwargs, **depends_on_arg
             )
             fsx_template.add_resource(fsx_filesystem)
         fsx_stack = CfnStack(
@@ -370,12 +372,10 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
         )
         cfn_stacks_factory.create_stack(fsx_stack)
         created_stacks.append(fsx_stack)
-
-        result = []
-        for resource in utils.get_cfn_resources(fsx_stack.name, region):
-            if resource["ResourceType"] == "AWS::FSx::FileSystem":
-                result.append(resource["PhysicalResourceId"])
-        return result
+        """
+        fsx_stack = CfnStack(name="integ-tests-fsx-2tpc15rp7rwrk8vr", region=region, template=None)
+        file_system_resource_name = "existingFSx"
+        return [fsx_stack.cfn_resources[f"{file_system_resource_name}{i}"] for i in range(num)]
 
     yield _fsx_factory
 

@@ -259,7 +259,7 @@ def test_validators_are_called_with_correct_argument(test_datadir, mocker):
             call(storage_type="new FSX", max_number=1, storage_count=1),
             call(storage_type="new RAID", max_number=1, storage_count=0),
         ],
-        any_order=True
+        any_order=True,
     )
     # No assertion on the argument for minor validators
     name_validator.assert_called()

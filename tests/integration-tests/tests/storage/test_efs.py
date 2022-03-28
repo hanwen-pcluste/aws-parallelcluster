@@ -84,12 +84,11 @@ def test_multiple_efs(
     existing_efs_filenames = []
     existing_efs_mount_dirs = []
     num_existing_efs = 2
+    existing_efss.extend(efs_stack_factory(num_existing_efs))
+    existing_efs_filenames.extend(
+        _write_file_into_efs(region, vpc_stack, existing_efss, request, key_name, cfn_stacks_factory)
+    )
     for i in range(num_existing_efs):
-        efs_id = efs_stack_factory().cfn_resources["FileSystemResource"]
-        existing_efss.append(efs_id)
-        existing_efs_filenames.append(
-            _write_file_into_efs(region, vpc_stack, efs_id, request, key_name, cfn_stacks_factory)
-        )
         existing_efs_mount_dirs.append(f"/existing_efs_mount_dir_{i}")
 
     new_efs_mount_dirs = []
@@ -124,11 +123,13 @@ def efs_stack_factory(cfn_stacks_factory, request, region):
     """EFS stack contains a single efs resource."""
     created_stacks = []
 
-    def create_efs():
+    def create_efs(num=1):
         efs_template = Template()
         efs_template.set_version("2010-09-09")
         efs_template.set_description("EFS stack created for testing existing EFS")
-        efs_template.add_resource(FileSystem("FileSystemResource"))
+        file_system_resource_name = "FileSystemResource"
+        for i in range(num):
+            efs_template.add_resource(FileSystem(f"{file_system_resource_name}{i}"))
         stack = CfnStack(
             name=generate_stack_name("integ-tests-efs", request.config.getoption("stackname_suffix")),
             region=region,
@@ -136,7 +137,7 @@ def efs_stack_factory(cfn_stacks_factory, request, region):
         )
         cfn_stacks_factory.create_stack(stack)
         created_stacks.append(stack)
-        return stack
+        return [stack.cfn_resources[f"{file_system_resource_name}{i}"] for i in range(num)]
 
     yield create_efs
 
@@ -145,21 +146,46 @@ def efs_stack_factory(cfn_stacks_factory, request, region):
             cfn_stacks_factory.delete_stack(stack.name, region)
 
 
-def _write_file_into_efs(region, vpc_stack, efs_id, request, key_name, cfn_stacks_factory):
+def _write_file_into_efs(region, vpc_stack, efs_ids, request, key_name, cfn_stacks_factory):
     """Write file stack contains a mount target and a instance to write a empty file with random name into the efs."""
     write_file_template = Template()
     write_file_template.set_version("2010-09-09")
     write_file_template.set_description("Stack to write a file to the existing EFS")
     default_security_group_id = get_default_vpc_security_group(vpc_stack.cfn_outputs["VpcId"], region)
-    write_file_template.add_resource(
-        MountTarget(
-            "MountTargetResource",
-            FileSystemId=efs_id,
-            SubnetId=vpc_stack.cfn_outputs["PublicSubnetId"],
-            SecurityGroups=[default_security_group_id],
+    for index, efs_id in enumerate(efs_ids):
+        depends_on_arg = {}
+        if index >= 15:
+            depends_on_arg = {"DependsOn": [f"MountTargetResource{index-15}"]}
+        write_file_template.add_resource(
+            MountTarget(
+                f"MountTargetResource{index}",
+                FileSystemId=efs_id,
+                SubnetId=vpc_stack.cfn_outputs["PublicSubnetId"],
+                SecurityGroups=[default_security_group_id],
+                **depends_on_arg,
+            )
         )
-    )
-    random_file_name = random_alphanumeric()
+    random_file_names = []
+    random_alphanumeric()
+    write_file_user_data = ""
+    for efs_id in efs_ids:
+        random_file_name = random_alphanumeric()
+        write_file_user_data += (
+            """
+        - file_system_id="""
+            + efs_id
+            + """
+        - efs_mount_point=/mnt/efs/fs
+        - mkdir -p "${!efs_mount_point}"
+        - mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev """
+            + """"${!file_system_id}.efs.${AWS::Region}.${AWS::URLSuffix}:/" "${!efs_mount_point}"
+        - touch ${!efs_mount_point}/"""
+            + random_file_name
+            + """
+        - umount ${!efs_mount_point}
+        """
+        )
+        random_file_names.append(random_file_name)
     user_data = (
         """
         #cloud-config
@@ -167,17 +193,9 @@ def _write_file_into_efs(region, vpc_stack, efs_id, request, key_name, cfn_stack
         package_upgrade: true
         runcmd:
         - yum install -y nfs-utils
-        - file_system_id_1="""
-        + efs_id
+        """
+        + write_file_user_data
         + """
-        - efs_mount_point_1=/mnt/efs/fs1
-        - mkdir -p "${!efs_mount_point_1}"
-        - mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev """
-        + """"${!file_system_id_1}.efs.${AWS::Region}.${AWS::URLSuffix}:/" "${!efs_mount_point_1}"
-        - touch ${!efs_mount_point_1}/"""
-        + random_file_name
-        + """
-        - umount ${!efs_mount_point_1}
         - opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource InstanceToWriteEFS --region ${AWS::Region}
         """
     )
@@ -190,7 +208,7 @@ def _write_file_into_efs(region, vpc_stack, efs_id, request, key_name, cfn_stack
             SubnetId=vpc_stack.cfn_outputs["PublicSubnetId"],
             UserData=Base64(Sub(user_data)),
             KeyName=key_name,
-            DependsOn=["MountTargetResource"],
+            DependsOn=[f"MountTargetResource{len(efs_ids)-1}"],
         )
     )
     write_file_stack = CfnStack(
@@ -202,7 +220,7 @@ def _write_file_into_efs(region, vpc_stack, efs_id, request, key_name, cfn_stack
 
     cfn_stacks_factory.delete_stack(write_file_stack.name, region)
 
-    return random_file_name
+    return random_file_names
 
 
 def _test_efs_correctly_shared(remote_command_executor, mount_dir, scheduler_commands):
