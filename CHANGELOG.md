@@ -7,6 +7,7 @@ x.x.x
 **ENHANCEMENTS**
 - Add support for multiple Elastic File Systems.
 - Add support for multiple FSx File Systems.
+- Add support for FSx Lustre Persistent_2 deployment type.
 
 **CHANGES**
 - Remove support for Python 3.6.
