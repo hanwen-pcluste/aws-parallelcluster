@@ -185,6 +185,12 @@ class Cache:
             cache.clear()
 
     @staticmethod
+    def add_cache(custom_cache):
+        """Add custom cache, so the cache created outside this wrapper can be cleared to."""
+        # Todo: Validate this approach
+        Cache._caches.append(custom_cache)
+
+    @staticmethod
     def _make_key(val):
         if isinstance(val, list):
             key = hash(tuple(Cache._make_key(x) for x in val))
