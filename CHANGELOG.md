@@ -12,6 +12,9 @@ x.x.x
 
 **CHANGES**
 - Remove support for Python 3.6.
+- Changes to FSx created by ParallelCluster:
+  - Change the default deployment type to `Scrach_2`.
+  - Change the lustre server version to `2.12`.
 
 **BUG FIXES**
 - Fix default for disable validate and test components when building custom AMI. The default was to disable those components, but it wasn't effective.
