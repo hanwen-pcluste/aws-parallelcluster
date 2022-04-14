@@ -12,6 +12,8 @@
 # This module contains all the classes representing the Resources objects.
 # These objects are obtained from the configuration file through a conversion based on the Schema classes.
 #
+import asyncio
+import concurrent
 import hashlib
 import json
 import logging
@@ -422,7 +424,10 @@ class Cluster:
             LOGGER.info("Validating cluster configuration...")
             Cluster._load_additional_instance_type_data(cluster_config_dict)
             config = self._load_config(cluster_config_dict)
-            validation_failures = config.validate(validator_suppressors)
+            loop = asyncio.get_event_loop()
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=20)
+            validation_failures = loop.run_until_complete(config.root_validate(executor, validator_suppressors))
+            loop.close()
             if any(f.level.value >= FailureLevel(validation_failure_level).value for f in validation_failures):
                 raise ConfigValidationError("Invalid cluster configuration.", validation_failures=validation_failures)
             LOGGER.info("Validation succeeded.")

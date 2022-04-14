@@ -12,6 +12,7 @@
 # This module contains all the classes representing the Resources objects.
 # These objects are obtained from the configuration file through a conversion based on the Schema classes.
 #
+import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -167,7 +168,7 @@ class Resource(ABC):
         """Create a resource attribute backed by a Configuration Parameter."""
         return Resource.Param(value, default=default, update_policy=update_policy)
 
-    def _validator_execute(self, validator_class, validator_args, suppressors):
+    async def _validator_execute(self, validator_class, validator_args, suppressors):
         validator = validator_class()
         if any(suppressor.suppress_validator(validator) for suppressor in (suppressors or [])):
             LOGGER.debug("Suppressing validator %s", validator_class.__name__)
@@ -187,22 +188,29 @@ class Resource(ABC):
                 nested_resources.extend(item for item in self.__getattribute__(attr) if isinstance(item, Resource))
         return nested_resources
 
-    def validate(self, suppressors: List[ValidatorSuppressor] = None) -> List[ValidationResult]:
+    async def root_validate(self, executor, suppressors: List[ValidatorSuppressor] = None) -> List[ValidationResult]:
+        async_tasks = await self.validate(executor, suppressors)
+        coroutines = [await task for task in async_tasks]
+        result = []
+        for coroutine in coroutines:
+            result.append(asyncio.create_task(coroutine))
+        return result
+
+    async def validate(self, executor, suppressors: List[ValidatorSuppressor] = None) -> List[ValidationResult]:
         """Execute registered validators."""
         # Cleanup failures and validators
+        loop = asyncio.get_event_loop()
         self._validation_failures.clear()
-
+        async_tasks = []
         # Call validators for nested resources
-        for nested_resource in self._nested_resources():
-            self._validation_failures.extend(nested_resource.validate(suppressors))
 
         # Update validators to be executed according to current status of the model and order by priority
         self._validators.clear()
         self._register_validators()
         for validator in self._validators:
-            self._validation_failures.extend(self._validator_execute(*validator, suppressors))
-
-        return self._validation_failures
+            print("Helllllllllllllllll")
+            async_tasks.append(loop.run_in_executor(executor, self._validator_execute, *validator, suppressors))
+        return async_tasks
 
     def _register_validators(self):
         """
