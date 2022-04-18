@@ -248,14 +248,23 @@ class FsxFileSystemInfo:
         self.file_system_data = file_system_data
 
     @property
+    def file_system_type(self):
+        """Return the type of FSx file system (LUSTRE, WINDOWS, ONTAP, or OPENZFS). WINDOWS is not supported."""
+        return self.file_system_data.get("FileSystemType")
+
+    @property
     def mount_name(self):
         """Return MountName of the filesystem."""
-        return self.file_system_data.get("LustreConfiguration").get("MountName")
+        return (
+            self.file_system_data.get("LustreConfiguration").get("MountName")
+            if self.file_system_type == "LUSTRE"
+            else ""
+        )
 
     @property
     def dns_name(self):
         """Return DNSName of the filesystem."""
-        return self.file_system_data.get("DNSName")
+        return self.file_system_data.get("DNSName") if self.file_system_type in ["LUSTRE", "OPENZFS"] else ""
 
     @property
     def file_system_id(self):

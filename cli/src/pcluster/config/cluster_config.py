@@ -34,6 +34,9 @@ from pcluster.constants import (
     EBS_VOLUME_SIZE_DEFAULT,
     EBS_VOLUME_TYPE_DEFAULT,
     EBS_VOLUME_TYPE_IOPS_DEFAULT,
+    FSX_LUSTRE,
+    FSX_ONTAP,
+    FSX_OPENZFS,
     MAX_EBS_COUNT,
     MAX_EXISTING_STORAGE_COUNT,
     MAX_NEW_STORAGE_COUNT,
@@ -294,13 +297,37 @@ class SharedEfs(Resource):
             self._register_validator(KmsKeyIdEncryptedValidator, kms_key_id=self.kms_key_id, encrypted=self.encrypted)
 
 
-class SharedFsx(Resource):
+class BaseSharedFsx(Resource):
+    """Represent the shared FSX resource."""
+
+    def __init__(self, mount_dir: str, name: str):
+        super().__init__()
+        self.mount_dir = Resource.init_param(mount_dir)
+        self.name = Resource.init_param(name)
+        self.shared_storage_type = SharedStorageType.FSX
+        self.__file_system_data = None
+
+    def _register_validators(self):
+        self._register_validator(SharedStorageNameValidator, name=self.name)
+
+    @property
+    def file_system_data(self):
+        """Return filesystem information if using existing FSx."""
+        if not self.__file_system_data and self.file_system_id:
+            self.__file_system_data = AWSApi.instance().fsx.get_file_systems_info([self.file_system_id])[0]
+        return self.__file_system_data
+
+    @property
+    def existing_dns_name(self):
+        """Return DNSName if using existing FSx filesystem."""
+        return self.file_system_data.dns_name if self.file_system_id else ""
+
+
+class SharedFsxLustre(BaseSharedFsx):
     """Represent the shared FSX resource."""
 
     def __init__(
         self,
-        mount_dir: str,
-        name: str,
         storage_capacity: int = None,
         deployment_type: str = None,
         data_compression_type: str = None,
@@ -318,11 +345,9 @@ class SharedFsx(Resource):
         auto_import_policy: str = None,
         drive_cache_type: str = None,
         fsx_storage_type: str = None,
+        **kwargs,
     ):
-        super().__init__()
-        self.mount_dir = Resource.init_param(mount_dir)
-        self.name = Resource.init_param(name)
-        self.shared_storage_type = SharedStorageType.FSX
+        super().__init__(**kwargs)
         self.storage_capacity = Resource.init_param(storage_capacity)
         self.fsx_storage_type = Resource.init_param(fsx_storage_type)
         self.deployment_type = Resource.init_param(deployment_type, default="SCRATCH_2")
@@ -340,11 +365,9 @@ class SharedFsx(Resource):
         self.file_system_id = Resource.init_param(file_system_id)
         self.auto_import_policy = Resource.init_param(auto_import_policy)
         self.drive_cache_type = Resource.init_param(drive_cache_type)
-        self.fsx_storage_type = Resource.init_param(fsx_storage_type)
-        self.__file_system_data = None
+        self.file_system_type = FSX_LUSTRE
 
     def _register_validators(self):
-        self._register_validator(SharedStorageNameValidator, name=self.name)
         self._register_validator(
             FsxS3Validator,
             import_path=self.import_path,
@@ -399,21 +422,54 @@ class SharedFsx(Resource):
             )
 
     @property
-    def file_system_data(self):
-        """Return filesystem information if using existing FSx."""
-        if not self.__file_system_data and self.file_system_id:
-            self.__file_system_data = AWSApi.instance().fsx.get_file_systems_info([self.file_system_id])[0]
-        return self.__file_system_data
-
-    @property
     def existing_mount_name(self):
         """Return MountName if using existing FSx filesystem."""
         return self.file_system_data.mount_name if self.file_system_id else ""
 
+
+class ExistingFsxOpenZfs(BaseSharedFsx):
+    """Represent the shared FSX for OpenZFS resource."""
+
+    def __init__(self, volume_id: str, **kwargs):
+        super().__init__(**kwargs)
+        self.volume_id = volume_id
+        self.file_system_type = FSX_OPENZFS
+
     @property
-    def existing_dns_name(self):
-        """Return DNSName if using existing FSx filesystem."""
-        return self.file_system_data.dns_name if self.file_system_id else ""
+    def file_system_id(self):
+        """Return the file system id behind the volume."""
+        return AWSApi.instance().fsx.describe_volumes([self.volume_id])[0]["FileSystemId"]
+
+    @property
+    def volume_path(self):
+        """Return the volume path."""
+        return AWSApi.instance().fsx.describe_volumes([self.volume_id])[0]["OpenZFSConfiguration"]["VolumePath"]
+
+
+class ExistingFsxOntap(BaseSharedFsx):
+    """Represent the shared FSX for Ontap resource."""
+
+    def __init__(self, volume_id: str, **kwargs):
+        super().__init__(**kwargs)
+        self.volume_id = volume_id
+        self.file_system_type = FSX_ONTAP
+
+    @property
+    def file_system_id(self):
+        """Return the file system id behind the volume."""
+        return AWSApi.instance().fsx.describe_volumes([self.volume_id])[0]["FileSystemId"]
+
+    @property
+    def storage_virtual_machine_id(self):
+        """Return the storage virtual machine behind the volume."""
+        return AWSApi.instance().fsx.describe_volumes([self.volume_id])[0]["OntapConfiguration"][
+            "StorageVirtualMachineId"
+        ]
+
+    @property
+    def junction_path(self):
+        """Return the junction path."""
+        return AWSApi.instance().fsx.describe_volumes([self.volume_id])[0]["OntapConfiguration"]["JunctionPath"]
 
 
 # ---------------------- Networking ---------------------- #
@@ -1105,7 +1161,7 @@ class BaseClusterConfig(Resource):
             self._register_validator(S3BucketValidator, bucket=self.custom_s3_bucket)
             self._register_validator(S3BucketRegionValidator, bucket=self.custom_s3_bucket, region=self.region)
 
-    def _register_storage_validators(self):
+    def _register_storage_validators(self):  # noqa: C901
         ebs_count = 0
         new_storage_count = defaultdict(int)
         existing_storage_count = defaultdict(int)
@@ -1120,11 +1176,21 @@ class BaseClusterConfig(Resource):
                 name_list=self.existing_fs_id_list,
                 resource_name="Shared Storage IDs",
             )
+
+            # Make a describe_volumes call to cache the boto3 result.
+            volume_ids = []
+            for storage in self.shared_storage:
+                if isinstance(storage, (ExistingFsxOpenZfs, ExistingFsxOntap)):
+                    volume_ids.append(storage.volume_id)
+            if volume_ids:
+                AWSApi.instance().fsx.describe_volumes(volume_ids)
+
             existing_fsx = []
+            existing_fsx_svm = []
             for storage in self.shared_storage:
                 self._register_validator(SharedStorageNameValidator, name=storage.name)
                 self._register_validator(SharedStorageMountDirValidator, mount_dir=storage.mount_dir)
-                if isinstance(storage, SharedFsx):
+                if isinstance(storage, SharedFsxLustre):
                     if storage.file_system_id:
                         existing_storage_count["fsx"] += 1
                         existing_fsx.append(storage.file_system_id)
@@ -1133,6 +1199,10 @@ class BaseClusterConfig(Resource):
                     self._register_validator(
                         FsxArchitectureOsValidator, architecture=self.head_node.architecture, os=self.image.os
                     )
+                if isinstance(storage, ExistingFsxOpenZfs):
+                    existing_fsx.append(storage.file_system_id)
+                if isinstance(storage, ExistingFsxOntap):
+                    existing_fsx_svm.append(storage.storage_virtual_machine_id)
                 if isinstance(storage, SharedEbs):
                     if storage.raid:
                         new_storage_count["raid"] += 1
@@ -1237,7 +1307,7 @@ class BaseClusterConfig(Resource):
         if self.shared_storage:
             for storage in self.shared_storage:
                 fs_id = None
-                if isinstance(storage, (SharedEfs, SharedFsx)):
+                if isinstance(storage, (SharedEfs, SharedFsxLustre)):
                     fs_id = storage.file_system_id
                 elif isinstance(storage, SharedEbs):
                     fs_id = storage.volume_id
@@ -1474,7 +1544,7 @@ class AwsBatchClusterConfig(BaseClusterConfig):
 
         if self.shared_storage:
             for storage in self.shared_storage:
-                if isinstance(storage, SharedFsx):
+                if isinstance(storage, SharedFsxLustre):
                     self._register_validator(AwsBatchFsxValidator)
 
         for queue in self.scheduling.queues:
