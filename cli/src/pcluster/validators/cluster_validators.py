@@ -408,6 +408,9 @@ class ExistingFsxNetworkingValidator(Validator):
     FSx networking validator.
 
     Validate file system mount point according to the head node subnet.
+    File system ids can be specified together with storage virtual machine ids. The code will get the file system ids
+    from storage virtual machine ids and combine the two file system ids lists to validate.
+    The reason to have this structure is to make boto3 calls as few as possible.
     """
 
     def _describe_network_interfaces(self, file_systems):
@@ -423,8 +426,10 @@ class ExistingFsxNetworkingValidator(Validator):
         else:
             return {}
 
-    def _validate(self, file_system_ids, head_node_subnet_id, are_all_security_groups_customized):
+    def _validate(self, file_system_ids, storage_virtual_machine_ids, head_node_subnet_id, are_all_security_groups_customized):
         try:
+
+            file_system_ids += AWSApi.instance().fsx.get_file_system_ids_by_svm_ids(storage_virtual_machine_ids)
 
             # Check to see if there is any existing mt on the fs
             file_systems = AWSApi.instance().fsx.get_file_systems_info(file_system_ids)

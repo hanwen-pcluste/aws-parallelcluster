@@ -90,7 +90,7 @@ from pcluster.config.cluster_config import (
     SchedulerPluginUser,
     SharedEbs,
     SharedEfs,
-    SharedFsx,
+    SharedFsxLustre,
     SlurmClusterConfig,
     SlurmComputeResource,
     SlurmQueue,
@@ -99,7 +99,7 @@ from pcluster.config.cluster_config import (
     SlurmSettings,
     Ssh,
     SudoerConfiguration,
-    Timeouts,
+    Timeouts, ExistingFsxOpenZfs, ExistingFsxOntap,
 )
 from pcluster.config.update_policy import UpdatePolicy
 from pcluster.constants import (
@@ -428,6 +428,21 @@ class FsxLustreSettingsSchema(BaseSchema):
                 raise ValidationError(message=messages)
 
 
+class FsxOpenZfsSettingsSchema(BaseSchema):
+    """Represent the FSX OpenZFS schema."""
+    file_system_id = fields.Str(
+        validate=validate.Regexp(r"^fs-[0-9a-z]{17}$"), metadata={"update_policy": UpdatePolicy.UNSUPPORTED}
+    )
+
+
+class FsxOntapSettingsSchema(BaseSchema):
+    """Represent the FSX Ontap schema."""
+    storage_virtual_machine_id = fields.Str(
+        validate=validate.Regexp(r"^svm-[0-9a-z]{17}$"), metadata={"update_policy": UpdatePolicy.UNSUPPORTED}
+    )
+    volume_junction_path = fields.Str(metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+
+
 class SharedStorageSchema(BaseSchema):
     """Represent the generic SharedStorage schema."""
 
@@ -437,12 +452,15 @@ class SharedStorageSchema(BaseSchema):
     name = fields.Str(required=True, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
     storage_type = fields.Str(
         required=True,
-        validate=validate.OneOf(["Ebs", "FsxLustre", "Efs"]),
+        validate=validate.OneOf(["Ebs", "FsxLustre", "FsxOpenZfs", "FsxOntap", "Efs"]),
         metadata={"update_policy": UpdatePolicy.UNSUPPORTED},
     )
     ebs_settings = fields.Nested(EbsSettingsSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
     efs_settings = fields.Nested(EfsSettingsSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
     fsx_lustre_settings = fields.Nested(FsxLustreSettingsSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    fsx_lustre_settings = fields.Nested(FsxLustreSettingsSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    fsx_open_zfs_settings = fields.Nested(FsxOpenZfsSettingsSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
+    fsx_ontap_settings = fields.Nested(FsxOntapSettingsSchema, metadata={"update_policy": UpdatePolicy.UNSUPPORTED})
 
     @validates_schema
     def no_coexist_storage_settings(self, data, **kwargs):
@@ -457,6 +475,8 @@ class SharedStorageSchema(BaseSchema):
             ("Ebs", "ebs_settings"),
             ("Efs", "efs_settings"),
             ("FsxLustre", "fsx_lustre_settings"),
+            ("FsxOpenZfs", "fsx_open_zfs_settings"),
+            ("FsxOntap", "fsx_ontap_settings"),
         ]:
             # Verify the settings section is associated to the right storage type
             if data.get(settings, None) and storage_type != data.get("storage_type"):
@@ -471,16 +491,20 @@ class SharedStorageSchema(BaseSchema):
         storage_type = data.get("storage_type")
         shared_volume_attributes = {"mount_dir": data.get("mount_dir"), "name": data.get("name")}
         settings = (
-            data.get("efs_settings", None) or data.get("fsx_lustre_settings", None) or data.get("ebs_settings", None)
+            data.get("efs_settings", None) or data.get("ebs_settings", None) or data.get("fsx_lustre_settings", None) or data.get("fsx_open_zfs_settings", None) or data.get("fsx_ontap_settings", None)
         )
         if settings:
             shared_volume_attributes.update(**settings)
         if storage_type == "Efs":
             return SharedEfs(**shared_volume_attributes)
-        elif storage_type == "FsxLustre":
-            return SharedFsx(**shared_volume_attributes)
         elif storage_type == "Ebs":
             return SharedEbs(**shared_volume_attributes)
+        elif storage_type == "FsxLustre":
+            return SharedFsxLustre(**shared_volume_attributes)
+        elif storage_type == "FsxOpenZfs":
+            return ExistingFsxOpenZfs(**shared_volume_attributes)
+        elif storage_type == "FsxOntap":
+            return ExistingFsxOntap(**shared_volume_attributes)
         return None
 
     @pre_dump
