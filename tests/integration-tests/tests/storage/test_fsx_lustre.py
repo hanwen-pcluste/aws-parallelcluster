@@ -23,7 +23,9 @@ from remote_command_executor import RemoteCommandExecutor
 from retrying import retry
 from time_utils import minutes, seconds
 from troposphere import Ref, Template, ec2
-from troposphere.fsx import FileSystem, LustreConfiguration
+from troposphere.fsx import FileSystem, LustreConfiguration, OpenZFSConfiguration, OntapConfiguration, \
+    StorageVirtualMachine, Volume, VolumeOntapConfiguration, VolumeOpenZFSConfiguration, RootVolumeConfiguration, \
+    NfsExports, ClientConfigurations
 
 BACKUP_NOT_YET_AVAILABLE_STATES = {"CREATING", "TRANSFERRING", "PENDING"}
 # Maximum number of minutes to wait past when an file system's automatic backup is scheduled to start creating.
@@ -185,8 +187,9 @@ def _test_fsx_lustre(
     assert_that(len(mount_dirs)).is_equal_to(len(fsx_fs_ids))
     for mount_dir, fsx_fs_id in zip(mount_dirs, fsx_fs_ids):
         logging.info("Checking %s on %s", fsx_fs_id, mount_dir)
-        assert_fsx_lustre_correctly_mounted(remote_command_executor, mount_dir, region, fsx_fs_id)
-        assert_fsx_lustre_correctly_shared(scheduler_commands, remote_command_executor, mount_dir)
+        if get_file_system_type(fsx_fs_id, region) == "LUSTRE":
+            assert_fsx_lustre_correctly_mounted(remote_command_executor, mount_dir, region, fsx_fs_id)
+        assert_fsx_correctly_shared(scheduler_commands, remote_command_executor, mount_dir)
         if bucket_name:
             _test_import_path(remote_command_executor, mount_dir)
             _test_export_path(remote_command_executor, mount_dir, bucket_name, region)
@@ -265,6 +268,8 @@ def test_multiple_fsx(
     os,
     region,
     fsx_factory,
+    svm_factory,
+    fsx_openzfs_volume_factory,
     vpc_stack,
     pcluster_config_reader,
     s3_bucket_factory,
@@ -280,9 +285,10 @@ def test_multiple_fsx(
     Check fsx_fs_id provided in config file can be mounted correctly
     """
     # Create s3 bucket and upload test_file
-    bucket_name = s3_bucket_factory()
-    bucket = boto3.resource("s3", region_name=region).Bucket(bucket_name)
-    bucket.upload_file(str(test_datadir / "s3_test_file"), "s3_test_file")
+    # bucket_name = s3_bucket_factory()
+    # bucket = boto3.resource("s3", region_name=region).Bucket(bucket_name)
+    # bucket.upload_file(str(test_datadir / "s3_test_file"), "s3_test_file")
+    bucket_name = "integ-tests-1topnxtihhso8pj0"
     import_path = "s3://{0}".format(bucket_name)
     export_path = "s3://{0}/export_dir".format(bucket_name)
     num_new_fsx = 1
@@ -294,23 +300,62 @@ def test_multiple_fsx(
     mount_dirs = ["/shared"]  # OSU benchmark relies on /shared directory
     for i in range(num_new_fsx + num_existing_fsx - 1):
         mount_dirs.append(f"/fsx_mount_dir{i}")
-    existing_fsx_fs_ids = fsx_factory(
-        num=num_existing_fsx,
-        FileSystemType="LUSTRE",
-        StorageCapacity=1200,
-        LustreConfiguration=LustreConfiguration(
-            title="lustreConfiguration",
-            ImportPath=import_path,
-            ExportPath=export_path,
-            DeploymentType="PERSISTENT_1",
-            PerUnitStorageThroughput=200,
-        ),
-    )
+    existing_fsx_lustre_fs_ids = []
+    # existing_fsx_lustre_fs_ids = fsx_factory(
+    #     ports=[988],
+    #     ip_protocols=["tcp"],
+    #     num=num_existing_fsx - 2,  # The other 2 FSx are OpenZFS and Ontap
+    #     file_system_type="LUSTRE",
+    #     StorageCapacity=1200,
+    #     LustreConfiguration=LustreConfiguration(
+    #         title="lustreConfiguration",
+    #         ImportPath=import_path,
+    #         ExportPath=export_path,
+    #         DeploymentType="PERSISTENT_1",
+    #         PerUnitStorageThroughput=200,
+    #     ),
+    # )
+    # fsx_ontap_fs_id = fsx_factory(
+    #     ports=[111, 2049, 20001, 20002, 20003],
+    #     ip_protocols=["tcp", "udp"],
+    #     num=1,
+    #     file_system_type="ONTAP",
+    #     StorageCapacity=1024,
+    #     OntapConfiguration=OntapConfiguration(
+    #         DeploymentType="SINGLE_AZ_1",
+    #         ThroughputCapacity=128
+    #     )
+    # )[0]
+    fsx_ontap_fs_id = "fs-05c0d3ff8f4c093d9"
+    #fsx_ontap_svm_id = svm_factory([fsx_ontap_fs_id])[0]
+    fsx_ontap_svm_id = "svm-0beec98b4a4f5e987"
+    # fsx_open_zfs_fs_id = fsx_factory(
+    #     ports=[111, 2049, 20001, 20002, 20003],
+    #     ip_protocols=["tcp", "udp"],
+    #     num=1,
+    #     file_system_type="OPENZFS",
+    #     StorageCapacity=64,
+    #     OpenZFSConfiguration=OpenZFSConfiguration(
+    #         DeploymentType="SINGLE_AZ_1",
+    #         ThroughputCapacity=64,
+    #         RootVolumeConfiguration=RootVolumeConfiguration(
+    #             NfsExports=[NfsExports(ClientConfigurations=[ClientConfigurations(Clients="*", Options=["rw", "crossmnt"])])]
+    #         )
+    #     )
+    # )[0]
+    fsx_open_zfs_fs_id = "fs-03289e84d0f40081f"
+    # fsx_openzfs_volume_factory([fsx_open_zfs_fs_id])
+
 
     cluster_config = pcluster_config_reader(
         bucket_name=bucket_name,
-        mount_dirs=mount_dirs,
-        existing_fsx_fs_ids=existing_fsx_fs_ids,
+        fsx_lustre_mount_dirs=mount_dirs[0:-2],
+        existing_fsx_lustre_fs_ids=existing_fsx_lustre_fs_ids,
+        fsx_open_zfs_fs_id=fsx_open_zfs_fs_id,
+        fsx_open_zfs_mount_dir=mount_dirs[-2],
+        fsx_ontap_fs_id=fsx_ontap_fs_id,
+        fsx_ontap_svm_id=fsx_ontap_svm_id,
+        fsx_ontap_mount_dir=mount_dirs[-1],
     )
     cluster = clusters_factory(cluster_config)
 
@@ -330,24 +375,24 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
     """
     created_stacks = []
 
-    def _fsx_factory(num=1, **kwargs):
+    def _fsx_factory(ports, ip_protocols, file_system_type, num=1, **kwargs):
         # FSx stack
         fsx_template = Template()
         fsx_template.set_version()
         fsx_template.set_description("Create FSx stack")
 
         # Create security group. If using an existing file system
-        # It must be associated to a security group that allows inbound TCP traffic to port 988
+        # It must be associated to a security group that allows inbound TCP/UDP traffic to specific ports
         fsx_sg = ec2.SecurityGroup(
             "FSxSecurityGroup",
             GroupDescription="SecurityGroup for testing existing FSx",
             SecurityGroupIngress=[
                 ec2.SecurityGroupRule(
-                    IpProtocol="tcp",
-                    FromPort="988",
-                    ToPort="988",
+                    IpProtocol=ip_protocol,
+                    FromPort=port,
+                    ToPort=port,
                     CidrIp="0.0.0.0/0",
-                ),
+                ) for port in ports for ip_protocol in ip_protocols
             ],
             VpcId=vpc_stack.cfn_outputs["VpcId"],
         )
@@ -362,6 +407,7 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
                 title=f"{file_system_resource_name}{i}",
                 SecurityGroupIds=[Ref(fsx_sg)],
                 SubnetIds=[vpc_stack.cfn_outputs["PublicSubnetId"]],
+                FileSystemType=file_system_type,
                 **kwargs,
                 **depends_on_arg,
             )
@@ -376,6 +422,110 @@ def fsx_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
         return [fsx_stack.cfn_resources[f"{file_system_resource_name}{i}"] for i in range(num)]
 
     yield _fsx_factory
+
+    if not request.config.getoption("no_delete"):
+        for stack in created_stacks:
+            cfn_stacks_factory.delete_stack(stack.name, region)
+
+
+@pytest.fixture(scope="class")
+def svm_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
+    """
+    Define a fixture to manage the creation and destruction of storage virtual machine for FSx for Ontap.
+
+    return svm_id
+    """
+    created_stacks = []
+
+    def _svm_factory(file_system_ids):
+        # SVM stack
+        fsx_svm_template = Template()
+        fsx_svm_template.set_version()
+        fsx_svm_template.set_description("Create Storage Virtual Machine stack")
+
+
+        storage_virtual_machine_resource_name = "StorageVirtualMachineFileSystemResource"
+        max_concurrency = 15
+        for index, file_system_id in enumerate(file_system_ids):
+            depends_on_arg = {}
+            if index >= max_concurrency:
+                depends_on_arg = {"DependsOn": [f"{storage_virtual_machine_resource_name}{index - max_concurrency}"]}
+            fsx_svm = StorageVirtualMachine(
+                title=f"{storage_virtual_machine_resource_name}{index}",
+                Name="fsx",
+                FileSystemId=file_system_id,
+                **depends_on_arg,
+            )
+            fsx_svm_template.add_resource(fsx_svm)
+            fsx_svm_volume = Volume(
+                title=f"{storage_virtual_machine_resource_name}Volume{index}",
+                Name="vol1",
+                VolumeType="ONTAP",
+                OntapConfiguration=VolumeOntapConfiguration(
+                    JunctionPath="/vol1",
+                    SizeInMegabytes="10240",
+                    StorageEfficiencyEnabled="true",
+                    StorageVirtualMachineId=Ref(fsx_svm)
+                )
+            )
+            fsx_svm_template.add_resource(fsx_svm_volume)
+        fsx_stack = CfnStack(
+            name=utils.generate_stack_name("integ-tests-fsx-svm", request.config.getoption("stackname_suffix")),
+            region=region,
+            template=fsx_svm_template.to_json(),
+        )
+        cfn_stacks_factory.create_stack(fsx_stack)
+        created_stacks.append(fsx_stack)
+        return [fsx_stack.cfn_resources[f"{storage_virtual_machine_resource_name}{i}"] for i in range(len(file_system_ids))]
+
+    yield _svm_factory
+
+    if not request.config.getoption("no_delete"):
+        for stack in created_stacks:
+            cfn_stacks_factory.delete_stack(stack.name, region)
+
+
+@pytest.fixture(scope="class")
+def fsx_openzfs_volume_factory(vpc_stack, cfn_stacks_factory, request, region, key_name):
+    """
+    Define a fixture to manage the creation and destruction of volumes of FSx for OpenZFS.
+
+    return svm_id
+    """
+    created_stacks = []
+
+    def _openzfs_volume_factory(file_system_ids):
+        fsx_volume_template = Template()
+        fsx_volume_template.set_version()
+        fsx_volume_template.set_description("Create Storage Virtual Machine stack")
+
+        root_volume=""
+        volume_resource_name = "VolumeResource"
+        max_concurrency = 15
+        for index, file_system_id in enumerate(file_system_ids):
+            depends_on_arg = {}
+            if index >= max_concurrency:
+                depends_on_arg = {"DependsOn": [f"{volume_resource_name}{index - max_concurrency}"]}
+            fsx_svm = Volume(
+                title=f"{volume_resource_name}{index}",
+                Name="vol1",
+                VolumeType="OPENZFS",
+                OpenZFSConfiguration=VolumeOpenZFSConfiguration(
+                    ParentVolumeId="fsvol-00267aebd7f96f38f"
+                ),
+                **depends_on_arg,
+            )
+            fsx_volume_template.add_resource(fsx_svm)
+        fsx_stack = CfnStack(
+            name=utils.generate_stack_name("integ-tests-fsx-openzfs-volume", request.config.getoption("stackname_suffix")),
+            region=region,
+            template=fsx_volume_template.to_json(),
+        )
+        cfn_stacks_factory.create_stack(fsx_stack)
+        created_stacks.append(fsx_stack)
+        return [fsx_stack.cfn_resources[f"{volume_resource_name}{i}"] for i in range(len(file_system_ids))]
+
+    yield _openzfs_volume_factory
 
     if not request.config.getoption("no_delete"):
         for stack in created_stacks:
@@ -413,6 +563,16 @@ def get_mount_name(fsx_fs_id, region):
     )
 
 
+def get_file_system_type(fsx_fs_id, region):
+    logging.info("Getting file system type from DescribeFilesystem API.")
+    fsx = boto3.client("fsx", region_name=region)
+    return (
+        fsx.describe_file_systems(FileSystemIds=[fsx_fs_id])
+        .get("FileSystems")[0]
+        .get("FileSystemType")
+    )
+
+
 def get_fsx_fs_ids(cluster, region):
     return utils.retrieve_cfn_outputs(cluster.cfn_name, region).get("FSXIds").split(",")
 
@@ -446,7 +606,7 @@ def _test_import_path(remote_command_executor, mount_dir):
     assert_that(result.stdout).is_equal_to("Downloaded by FSx Lustre")
 
 
-def assert_fsx_lustre_correctly_shared(scheduler_commands, remote_command_executor, mount_dir):
+def assert_fsx_correctly_shared(scheduler_commands, remote_command_executor, mount_dir):
     logging.info("Testing fsx lustre correctly mounted on compute nodes")
     remote_command_executor.run_remote_command("touch {mount_dir}/test_file".format(mount_dir=mount_dir))
     job_command = "cat {mount_dir}/test_file && touch {mount_dir}/compute_output".format(mount_dir=mount_dir)

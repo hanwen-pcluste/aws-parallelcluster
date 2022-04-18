@@ -18,6 +18,7 @@ class FSxClient(Boto3Client):
     def __init__(self):
         super().__init__("fsx")
         self.cache = {}
+        self.svm_cache = {}
 
     @AWSExceptionHandler.handle_client_exception
     def get_file_systems_info(self, fsx_fs_ids):
@@ -42,6 +43,30 @@ class FSxClient(Boto3Client):
                 self.cache[file_system_info.file_system_id] = file_system_info
                 result.append(file_system_info)
         return result
+
+    @AWSExceptionHandler.handle_client_exception
+    def describe_storage_virtual_machines(self, storage_virtual_machine_ids):
+        """Describe storage virtual machines."""
+        result = []
+        missed_storage_virtual_machine_ids = []
+        for storage_virtual_machine_id in storage_virtual_machine_ids:
+            cached_data = self.svm_cache.get(storage_virtual_machine_id)
+            if cached_data:
+                result.append(cached_data)
+            else:
+                missed_storage_virtual_machine_ids.append(storage_virtual_machine_id)
+        if missed_storage_virtual_machine_ids:
+            response = self._client.describe_storage_virtual_machines(
+                StorageVirtualMachineIds=missed_storage_virtual_machine_ids
+            )["StorageVirtualMachines"]
+            for storage_virtual_machine in response:
+                self.svm_cache[storage_virtual_machine.get("StorageVirtualMachineId")] = storage_virtual_machine
+                result.append(storage_virtual_machine)
+        return result
+
+    def get_file_system_ids_by_svm_ids(self, storage_virtual_machine_ids):
+        """Get file system ids by svm ids. The order is not guaranteed."""
+        return [svm["FileSystemId"] for svm in self.describe_storage_virtual_machines(storage_virtual_machine_ids)]
 
     @AWSExceptionHandler.handle_client_exception
     def describe_backup(self, backup_id):
