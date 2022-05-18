@@ -35,6 +35,7 @@ from utils import generate_stack_name, random_alphanumeric, render_jinja_templat
 from tests.ad_integration.cluster_user import ClusterUser
 from tests.common.osu_common import compile_osu
 from tests.common.utils import get_sts_endpoint, retrieve_latest_ami, run_system_analyzer
+from tests.storage.test_fsx_lustre import create_fsx_ontap, create_fsx_open_zfs
 
 NUM_USERS_TO_CREATE = 5
 NUM_USERS_TO_TEST = 3
@@ -473,6 +474,8 @@ def _check_files_permissions(users):
             f"/shared/{user.alias}_file",
             f"/ebs/{user.alias}_file",
             f"/efs/{user.alias}_file",
+            f"/fsxopenzfs/{user.alias}_file",
+            f"/fsxontap/{user.alias}_file",
         ]:
             user.run_remote_command(f"touch {path}")
             # Specify that only owner of file should have read/write access.
@@ -633,12 +636,7 @@ def _check_ssh_key(user, ssh_generation_enabled, remote_command_executor, schedu
 @pytest.mark.parametrize(
     "directory_type,directory_protocol,directory_certificate_verification",
     [
-        ("SimpleAD", "ldap", False),
-        # ("SimpleAD", "ldaps", False),
         ("SimpleAD", "ldaps", True),
-        ("MicrosoftAD", "ldap", False),
-        # ("MicrosoftAD", "ldaps", False),
-        ("MicrosoftAD", "ldaps", True),
     ],
 )
 @pytest.mark.usefixtures("os", "instance")
@@ -657,6 +655,8 @@ def test_ad_integration(
     clusters_factory,
     run_benchmarks,
     benchmarks,
+    fsx_factory,
+    svm_factory,
 ):
     """
     Verify AD integration works as expected.
@@ -700,6 +700,10 @@ def test_ad_integration(
             directory_certificate_verification,
         )
     )
+    # fsx_ontap_fs_id = create_fsx_ontap(fsx_factory, num=1)[0]
+    # fsx_ontap_svm_id = svm_factory([fsx_ontap_fs_id])[0]
+    # fsx_open_zfs_fs_id = create_fsx_open_zfs(fsx_factory, num=1)[0]
+    # cluster_config = pcluster_config_reader(benchmarks=benchmarks, fsx_open_zfs_fs_id=fsx_open_zfs_fs_id, fsx_ontap_svm_id=fsx_ontap_svm_id, fsx_ontap_fs_id=fsx_ontap_fs_id, **config_params)
     cluster_config = pcluster_config_reader(benchmarks=benchmarks, **config_params)
     cluster = clusters_factory(cluster_config)
 

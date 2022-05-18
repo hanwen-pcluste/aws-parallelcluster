@@ -70,14 +70,12 @@ SharedStorage:
     Name: existingopenzfs
     StorageType: FsxOpenZfs
     FsxOpenZfsSettings:
-      FileSystemId: {{ fsx_open_zfs_fs_id }}
+      VolumeId: {{ fsx_open_zfs_volume_id }}
   - MountDir: fsx3
     Name: existingontap
     StorageType: FsxOntap
     FsxOntapSettings:
-      FileSystemId: {{ fsx_ontap_fs_id }}
-      StorageVirtualMachineId: {{ fsx_ontap_svm_id }}
-      VolumeJunctionPath: /vol1
+      VolumeId: {{ fsx_ontap_volume_id }}
 {% if os == "centos7" and architechture=="x86_64"%}
 AdditionalPackages:
   IntelSoftware:

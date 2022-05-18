@@ -466,10 +466,10 @@ class ExistingFsxNetworkingValidator(Validator):
                 for network_interface_id in network_interface_ids:
                     network_interface_responses.append(network_interfaces_data[network_interface_id])
 
-                fs_access = False
                 network_interfaces = [ni for ni in network_interface_responses if ni.get("VpcId") == vpc_id]
                 ports = FSX_PORTS[file_system.file_system_type]
                 for port in ports:
+                    fs_access = False
                     for network_interface in network_interfaces:
                         # Get list of security group IDs
                         sg_ids = [sg.get("GroupId") for sg in network_interface.get("Groups")]

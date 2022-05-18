@@ -33,7 +33,9 @@ from tests.common.utils import get_default_vpc_security_group, get_route_tables,
 from tests.storage.test_fsx_lustre import (
     assert_fsx_correctly_shared,
     assert_fsx_lustre_correctly_mounted,
-    get_fsx_fs_ids, create_fsx_ontap, create_fsx_open_zfs,
+    create_fsx_ontap,
+    create_fsx_open_zfs,
+    get_fsx_fs_ids,
 )
 
 
@@ -110,13 +112,14 @@ def test_cluster_in_no_internet_subnet(
     pcluster_config_reader,
     vpc_stack,
     s3_bucket_factory,
+    fsx_factory,
+    svm_factory,
     clusters_factory,
     test_datadir,
     architecture,
     os,
     mpi_variants,
     bastion_instance,
-    fsx_factory,
 ):
     """
     This test creates a cluster in a subnet with no internet, run simple integration test to check prolog and epilog
@@ -126,10 +129,15 @@ def test_cluster_in_no_internet_subnet(
     _upload_pre_install_script(bucket_name, test_datadir)
 
     vpc_default_security_group_id = get_default_vpc_security_group(vpc_stack.cfn_outputs["VpcId"], region)
-    fsx_ontap_id = create_fsx_ontap(fsx_factory, num=1)
-    fsx_open_zfs_id = create_fsx_open_zfs(fsx_factory, num=1)
+    fsx_ontap_fs_id = create_fsx_ontap(fsx_factory, num=1)[0]
+    _, fsx_ontap_volume_id = svm_factory([fsx_ontap_fs_id])[0]
+    _, fsx_open_zfs_volume_id = create_fsx_open_zfs(fsx_factory, num=1)[0]
     cluster_config = pcluster_config_reader(
-        vpc_default_security_group_id=vpc_default_security_group_id, bucket_name=bucket_name, architecture=architecture, fsx_ontap_id=fsx_ontap_id, fsx_open_zfs_id=fsx_open_zfs_id
+        vpc_default_security_group_id=vpc_default_security_group_id,
+        bucket_name=bucket_name,
+        architecture=architecture,
+        fsx_ontap_volume_id=fsx_ontap_volume_id,
+        fsx_open_zfs_volume_id=fsx_open_zfs_volume_id,
     )
     cluster = clusters_factory(cluster_config)
 

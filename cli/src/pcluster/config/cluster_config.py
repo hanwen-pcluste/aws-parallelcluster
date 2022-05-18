@@ -1186,7 +1186,6 @@ class BaseClusterConfig(Resource):
                 AWSApi.instance().fsx.describe_volumes(volume_ids)
 
             existing_fsx = []
-            existing_fsx_svm = []
             for storage in self.shared_storage:
                 self._register_validator(SharedStorageNameValidator, name=storage.name)
                 self._register_validator(SharedStorageMountDirValidator, mount_dir=storage.mount_dir)
@@ -1202,7 +1201,7 @@ class BaseClusterConfig(Resource):
                 if isinstance(storage, ExistingFsxOpenZfs):
                     existing_fsx.append(storage.file_system_id)
                 if isinstance(storage, ExistingFsxOntap):
-                    existing_fsx_svm.append(storage.storage_virtual_machine_id)
+                    existing_fsx.append(storage.file_system_id)
                 if isinstance(storage, SharedEbs):
                     if storage.raid:
                         new_storage_count["raid"] += 1

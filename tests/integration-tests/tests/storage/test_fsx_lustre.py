@@ -273,7 +273,7 @@ def test_fsx_lustre_backup(region, pcluster_config_reader, clusters_factory, sch
 
 def create_fsx_ontap(fsx_factory, num):
     return fsx_factory(
-        ports=[111, 2049, 20001, 20002, 20003],
+        ports=[111, 635, 2049, 4046],
         ip_protocols=["tcp", "udp"],
         num=num,
         file_system_type="ONTAP",
@@ -329,7 +329,7 @@ def test_multiple_fsx(
     # bucket_name = s3_bucket_factory()
     # bucket = boto3.resource("s3", region_name=region).Bucket(bucket_name)
     # bucket.upload_file(str(test_datadir / "s3_test_file"), "s3_test_file")
-    bucket_name = "integ-tests-1topnxtihhso8pj0"
+    bucket_name = "integ-tests-witesyouoxsfrqc2"
     import_path = "s3://{0}".format(bucket_name)
     export_path = "s3://{0}/export_dir".format(bucket_name)
     num_new_fsx = 1
