@@ -2,7 +2,7 @@ CHANGELOG
 =========
 
 x.x.x
-------
+-------
 
 **ENHANCEMENTS**
 - Add new configuration parameter `Scheduling/SlurmSettings/QueueUpdateStrategy` to allow cluster update when
