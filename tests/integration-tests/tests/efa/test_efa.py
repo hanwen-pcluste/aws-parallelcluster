@@ -54,19 +54,8 @@ def test_efa(
     else:
         head_node_instance = "c6g.16xlarge"
 
-    # Post-install script to use P4d targeted ODCR
-    bucket_name = ""
-    if instance == "p4d.24xlarge":
-        bucket_name = s3_bucket_factory()
-        bucket = boto3.resource("s3", region_name=region).Bucket(bucket_name)
-        bucket.upload_file(str(test_datadir / "run_instance_override.sh"), "run_instance_override.sh")
-
     slots_per_instance = fetch_instance_slots(region, instance, multithreading_disabled=True)
-    cluster_config = pcluster_config_reader(
-        max_queue_size=max_queue_size,
-        head_node_instance=head_node_instance,
-        bucket_name=bucket_name,
-    )
+    cluster_config = pcluster_config_reader(max_queue_size=max_queue_size, head_node_instance=head_node_instance)
     cluster = clusters_factory(cluster_config)
     remote_command_executor = RemoteCommandExecutor(cluster)
     scheduler_commands = scheduler_commands_factory(remote_command_executor)
