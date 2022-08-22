@@ -2489,3 +2489,33 @@ class SlurmClusterConfig(CommonSchedulerClusterConfig):
             self.__image_dict[queue.name] = queue.queue_ami or self.image.custom_ami or self.official_ami
 
         return self.__image_dict
+
+    @property
+    def _capacity_reservation_targets(self):
+        """Return a list of capacity reservation targets from all queues and compute resources with the section."""
+        capacity_reservation_targets_list = []
+        for queue in self.scheduling.queues:
+            if queue.capacity_reservation_target:
+                capacity_reservation_targets_list.append(queue.capacity_reservation_target)
+            for compute_resource in queue.compute_resources:
+                if compute_resource.capacity_reservation_target:
+                    capacity_reservation_targets_list.append(compute_resource.capacity_reservation_target)
+        return capacity_reservation_targets_list
+
+    @property
+    def capacity_reservation_ids(self):
+        """Return a list of capacity reservation ids specified in the config."""
+        result = set()
+        for capacity_reservation_target in self._capacity_reservation_targets:
+            if capacity_reservation_target.capacity_reservation_id:
+                result.add(capacity_reservation_target.capacity_reservation_id)
+        return list(result)
+
+    @property
+    def capacity_reservation_resource_group_arns(self):
+        """Return a list of capacity reservation resource group in the config."""
+        result = set()
+        for capacity_reservation_target in self._capacity_reservation_targets:
+            if capacity_reservation_target.capacity_reservation_resource_group_arn:
+                result.add(capacity_reservation_target.capacity_reservation_resource_group_arn)
+        return list(result)
