@@ -654,6 +654,31 @@ class HeadNodeIamResources(NodeIamResourcesBase):
                             ]
                         )
 
+        if self._config.scheduling.scheduler == "slurm":
+            if self._config.capacity_reservation_targets:
+                for capacity_reservation_target in self._config.capacity_reservation_targets:
+                    if capacity_reservation_target.capacity_reservation_id:
+                        policy.append(
+                            iam.PolicyStatement(
+                                actions=["ec2:RunInstances"],
+                                effect=iam.Effect.ALLOW,
+                                resources=[
+                                    self._format_arn(
+                                        service="ec2",
+                                        resource=f"capacity-reservation/{capacity_reservation_target.capacity_reservation_id}",
+                                    )
+                                ],
+                            )
+                        )
+                    elif capacity_reservation_target.capacity_reservation_resource_group_arn:
+                        policy.append(
+                            iam.PolicyStatement(
+                                actions=["ec2:RunInstances"],
+                                effect=iam.Effect.ALLOW,
+                                resources=[self.capacity_reservation_target.capacity_reservation_resource_group_arn],
+                            )
+                        )
+
         if self._config.directory_service:
             policy.append(
                 iam.PolicyStatement(

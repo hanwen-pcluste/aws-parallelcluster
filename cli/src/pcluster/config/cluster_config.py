@@ -2482,3 +2482,13 @@ class SlurmClusterConfig(CommonSchedulerClusterConfig):
             self.__image_dict[queue.name] = queue.queue_ami or self.image.custom_ami or self.official_ami
 
         return self.__image_dict
+
+    @property
+    def capacity_reservation_targets(self):
+        """Return a list of capacity reservation targets from all compute resources with the section."""
+        capacity_reservation_targets_list = []
+        for queue in self.scheduling.queues:
+            for compute_resource in queue.compute_resources:
+                if compute_resource.capacity_reservation_target:
+                    capacity_reservation_targets_list.append(compute_resource.capacity_reservation_target)
+        return capacity_reservation_targets_list
