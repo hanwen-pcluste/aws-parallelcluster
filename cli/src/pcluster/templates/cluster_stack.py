@@ -1395,6 +1395,15 @@ class ComputeFleetConstruct(Construct):
                 ),
             )
 
+        capacity_reservation_specification = None
+        if compute_resource.capacity_reservation_target:
+            capacity_reservation_specification = ec2.CfnLaunchTemplate.CapacityReservationSpecificationProperty(
+                capacity_reservation_target=ec2.CfnLaunchTemplate.CapacityReservationTargetProperty(
+                    capacity_reservation_id=compute_resource.capacity_reservation_target.capacity_reservation_id,
+                    capacity_reservation_resource_group_arn=compute_resource.capacity_reservation_target.capacity_reservation_resource_group_arn,
+                )
+            )
+
         conditional_template_properties = {}
 
         if compute_resource.is_ebs_optimized:
@@ -1419,6 +1428,7 @@ class ComputeFleetConstruct(Construct):
                 ),
                 instance_market_options=instance_market_options,
                 instance_initiated_shutdown_behavior="terminate",
+                capacity_reservation_specification=capacity_reservation_specification,
                 user_data=Fn.base64(
                     Fn.sub(
                         get_user_data_content("../resources/compute_node/user_data.sh"),

@@ -35,6 +35,7 @@ from pcluster.config.cluster_config import (
     AwsBatchQueueNetworking,
     AwsBatchScheduling,
     AwsBatchSettings,
+    CapacityReservationTarget,
     CapacityType,
     CloudWatchDashboards,
     CloudWatchLogs,
@@ -939,6 +940,18 @@ class TimeoutsSchema(BaseSchema):
         return Timeouts(**data)
 
 
+class CapacityReservationTargetSchema(BaseSchema):
+    """Represent the schema of the CapacityReservationTarget section."""
+
+    capacity_reservation_id = fields.Str(metadata={"update_policy": UpdatePolicy.QUEUE_UPDATE_STRATEGY})
+    capacity_reservation_resource_group_arn = fields.Str(metadata={"update_policy": UpdatePolicy.QUEUE_UPDATE_STRATEGY})
+
+    @post_load()
+    def make_resource(self, data, **kwargs):
+        """Generate resource."""
+        return CapacityReservationTarget(**data)
+
+
 class ClusterDevSettingsSchema(BaseDevSettingsSchema):
     """Represent the schema of Dev Setting."""
 
@@ -1109,6 +1122,9 @@ class SlurmComputeResourceSchema(_ComputeResourceSchema):
     efa = fields.Nested(EfaSchema, metadata={"update_policy": UpdatePolicy.QUEUE_UPDATE_STRATEGY})
     disable_simultaneous_multithreading = fields.Bool(metadata={"update_policy": UpdatePolicy.COMPUTE_FLEET_STOP})
     schedulable_memory = fields.Int(metadata={"update_policy": UpdatePolicy.QUEUE_UPDATE_STRATEGY})
+    capacity_reservation_target = fields.Nested(
+        CapacityReservationTargetSchema, metadata={"update_policy": UpdatePolicy.QUEUE_UPDATE_STRATEGY}
+    )
 
     @validates_schema
     def no_coexist_instance_type_flexibility(self, data, **kwargs):
