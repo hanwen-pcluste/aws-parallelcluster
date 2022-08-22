@@ -862,6 +862,15 @@ class Timeouts(Resource):
         )
 
 
+class CapacityReservationTarget(Resource):
+    """Represent the CapacityReservationTarget configuration."""
+
+    def __init__(self, capacity_reservation_id: str = None, capacity_reservation_resource_group_arn: str = None):
+        super().__init__()
+        self.capacity_reservation_id = Resource.init_param(capacity_reservation_id)
+        self.capacity_reservation_resource_group_arn = Resource.init_param(capacity_reservation_resource_group_arn)
+
+
 class ClusterDevSettings(BaseDevSettings):
     """Represent the dev settings configuration."""
 
@@ -1602,6 +1611,7 @@ class _BaseSlurmComputeResource(BaseComputeResource):
         efa: Efa = None,
         disable_simultaneous_multithreading: bool = None,
         schedulable_memory: int = None,
+        capacity_reservation_target: CapacityReservationTarget = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -1613,6 +1623,7 @@ class _BaseSlurmComputeResource(BaseComputeResource):
         )
         self.efa = efa or Efa(enabled=False, implied=True)
         self.schedulable_memory = Resource.init_param(schedulable_memory)
+        self.capacity_reservation_target = capacity_reservation_target
         self._instance_types_with_instance_storage = []
         self._instance_type_info_map = {}
 
@@ -1814,11 +1825,13 @@ class SlurmQueue(_CommonQueue):
         compute_resources: List[_BaseSlurmComputeResource],
         networking: SlurmQueueNetworking,
         allocation_strategy: str = "lowest-price",
+        capacity_reservation_target: CapacityReservationTarget = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.compute_resources = compute_resources
         self.networking = networking
+        self.capacity_reservation_target = capacity_reservation_target
         if any(isinstance(compute_resource, SlurmFlexibleComputeResource) for compute_resource in compute_resources):
             self.allocation_strategy = allocation_strategy
 
