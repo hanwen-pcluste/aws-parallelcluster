@@ -16,6 +16,7 @@ from pcluster.aws.common import AWSClientError
 from pcluster.config.cluster_config import CapacityType, PlacementGroup
 from pcluster.validators.ec2_validators import (
     AmiOsCompatibleValidator,
+    CapacityReservationValidator,
     CapacityTypeValidator,
     InstanceTypeBaseAMICompatibleValidator,
     InstanceTypeMemoryInfoValidator,
@@ -503,4 +504,70 @@ def test_placement_group_validator(
         side_effect=side_effect,
     )
     actual_failures = PlacementGroupNamingValidator().execute(placement_group=placement_group)
+    assert_failure_messages(actual_failures, expected_message)
+
+
+@pytest.mark.parametrize(
+    "capacity_reservation_instance_type, capacity_reservation_availability_zone, "
+    "instance_type, subnet_availability_zone, expected_message",
+    [
+        ("c5.xlarge", "us-east-1a", "c5.xlarge", "us-east-1a", None),
+        # Wrong instance type
+        (
+            "m5.xlarge",
+            "us-east-1a",
+            "c5.xlarge",
+            "us-east-1a",
+            "Capacity reservation .* must has the same instance type as c5.xlarge.",
+        ),
+        # Wrong availability zone
+        (
+            "c5.xlarge",
+            "us-east-1b",
+            "c5.xlarge",
+            "us-east-1a",
+            "Capacity reservation .* must use the same availability zone as subnet",
+        ),
+        # Both instance type and availability zone are wrong
+        (
+            "m5.xlarge",
+            "us-east-1b",
+            "c5.xlarge",
+            "us-east-1a",
+            "Capacity reservation .* must has the same instance type as c5.xlarge.",
+        ),
+        (
+            "m5.xlarge",
+            "us-east-1b",
+            "c5.xlarge",
+            "us-east-1a",
+            "Capacity reservation .* must use the same availability zone as subnet",
+        ),
+    ],
+)
+def test_capacity_reservation_validator_validator(
+    mocker,
+    capacity_reservation_instance_type,
+    capacity_reservation_availability_zone,
+    instance_type,
+    subnet_availability_zone,
+    expected_message,
+):
+    mock_aws_api(mocker)
+    mocker.patch(
+        "pcluster.aws.ec2.Ec2Client.describe_capacity_reservations",
+        return_value=[
+            {
+                "InstanceType": capacity_reservation_instance_type,
+                "AvailabilityZone": capacity_reservation_availability_zone,
+            }
+        ],
+    )
+    mocker.patch(
+        "pcluster.aws.ec2.Ec2Client.get_subnet_avail_zone",
+        return_value=subnet_availability_zone,
+    )
+    actual_failures = CapacityReservationValidator().execute(
+        capacity_reservation_id="cr-123", instance_type=instance_type, subnet="subnet-123"
+    )
     assert_failure_messages(actual_failures, expected_message)
