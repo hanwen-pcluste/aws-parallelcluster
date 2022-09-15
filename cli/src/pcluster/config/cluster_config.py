@@ -2383,13 +2383,13 @@ class CommonSchedulerClusterConfig(BaseClusterConfig):
                     self._register_validator(
                         CapacityReservationValidator,
                         capacity_reservation_id=cr_target.capacity_reservation_id,
-                        instance_type=compute_resource.instance_type,
+                        instance_type=compute_resource.instance_types[0],
                         subnet=queue.networking.subnet_ids[0],
                     )
                     self._register_validator(
                         CapacityReservationResourceGroupValidator,
                         capacity_reservation_resource_group_arn=cr_target.capacity_reservation_resource_group_arn,
-                        instance_type=compute_resource.instance_type,
+                        instance_type=compute_resource.instance_types[0],
                         subnet=queue.networking.subnet_ids[0],
                     )
 
