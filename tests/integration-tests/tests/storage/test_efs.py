@@ -237,7 +237,7 @@ def _assert_subnet_az_relations(region, vpc_stack, expected_in_same_az):
 def _test_efs_utils(remote_command_executor, scheduler_commands, cluster, region, mount_dirs, efs_ids):
     compute_node_remote_command_executors = []
     for compute_node_ip in get_compute_nodes_instance_ips(cluster.name, region):
-        compute_node_remote_command_executors(RemoteCommandExecutor(cluster, compute_node_ip=compute_node_ip))
+        compute_node_remote_command_executors.append(RemoteCommandExecutor(cluster, compute_node_ip=compute_node_ip))
     for mount_dir in mount_dirs:
         remote_command_executor.run_remote_command(f"sudo umount {mount_dir}")
         for compute_node_remote_command_executor in compute_node_remote_command_executors:
