@@ -766,6 +766,7 @@ def test_ad_integration(
         config_file="pcluster.config.update.yaml", benchmarks=benchmarks, **config_params
     )
     cluster.update(str(updated_config_file), force_update="true")
+    time.sleep(60)
     # Reset stateful connection variables after the cluster update
     remote_command_executor = RemoteCommandExecutor(cluster)
     scheduler_commands = scheduler_commands_factory(remote_command_executor)
@@ -782,6 +783,7 @@ def test_ad_integration(
         config_file="pcluster.config.update2.yaml", benchmarks=benchmarks, **config_params
     )
     cluster.update(str(updated_config_file), force_update="true")
+    time.sleep(60)
     # Reset stateful connection variables after the cluster update
     remote_command_executor = RemoteCommandExecutor(cluster)
     scheduler_commands = scheduler_commands_factory(remote_command_executor)
