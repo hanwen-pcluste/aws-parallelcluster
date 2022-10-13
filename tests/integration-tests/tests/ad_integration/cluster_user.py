@@ -3,7 +3,10 @@ import os
 
 from assertpy import assert_that
 from paramiko import AutoAddPolicy, SSHClient
+from retrying import retry
+
 from remote_command_executor import RemoteCommandExecutor
+from time_utils import seconds
 from utils import run_command
 
 
@@ -96,6 +99,7 @@ class ClusterUser:
         """Wrapper around SchedulerCommand's assert_job_succeded method."""
         self._personalized_scheduler_commands.assert_job_succeeded(job_id)
 
+    @retry(wait_fixed=seconds(3), stop_max_delay=seconds(10))
     def cleanup(self):
         """Cleanup resources associated with this user."""
         logging.info("Removing home directory for user %s (%s)", self.alias, self.home_dir)
