@@ -622,6 +622,22 @@ def inject_additional_config_settings(  # noqa: C901
     if request.config.getoption("custom_ami") and not dict_has_nested_key(config_content, ("Image", "CustomAmi")):
         dict_add_nested_key(config_content, request.config.getoption("custom_ami"), ("Image", "CustomAmi"))
 
+    if not dict_has_nested_key(config_content, ("HeadNode", "CustomActions", "OnNodeStart", "Script")):
+        dict_add_nested_key(
+            config_content,
+            "https://raw.githubusercontent.com/demartinofra/aws-parallelcluster/custom-scripts/experimental/scripts/disable-ec2-user-root.sh",
+            ("HeadNode", "CustomActions", "OnNodeStart", "Script"),
+        )
+    if config_content["Scheduling"]["Scheduler"] == "slurm":
+        queues = config_content["Scheduling"]["SlurmQueues"]
+        for queue in queues:
+            if not dict_has_nested_key(queue, ("CustomActions", "OnNodeStart", "Script")):
+                dict_add_nested_key(
+                    queue,
+                    "https://raw.githubusercontent.com/demartinofra/aws-parallelcluster/custom-scripts/experimental/scripts/disable-ec2-user-root.sh",
+                    ("CustomActions", "OnNodeStart", "Script"),
+                )
+
     if not dict_has_nested_key(config_content, ("DevSettings", "AmiSearchFilters")):
         if (
             request.config.getoption("pcluster_git_ref")
