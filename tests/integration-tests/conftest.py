@@ -805,7 +805,7 @@ AVAILABILITY_ZONE_OVERRIDES = {
     # some instance type is only supported in use2-az2
     "us-east-2": ["use2-az2"],
     # trn available on usw2-az4
-    "us-west-2": ["usw2-az4"],
+    "us-west-2": ["usw2-az4", "usw2-lax1-az1"],
     # c5.xlarge is not supported in apse2-az3
     "ap-southeast-2": ["apse2-az1", "apse2-az2"],
     # m6g.xlarge is not supported in apne1-az2
@@ -990,7 +990,7 @@ def vpc_stacks(cfn_stacks_factory, request):
             cidr="192.168.64.0/18",  # 16382 IPs
             map_public_ip_on_launch=False,
             has_nat_gateway=False,
-            availability_zone=availability_zones[0],
+            availability_zone=availability_zones[1],
             default_gateway=Gateways.NAT_GATEWAY,
         )
         private_subnet_different_cidr = SubnetConfig(
