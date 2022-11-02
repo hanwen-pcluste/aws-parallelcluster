@@ -162,17 +162,17 @@ def _write_user_data(efs_id, random_file_name):
 
 
 def test_efs_correctly_mounted(remote_command_executor, mount_dir):
-    logging.info("Testing ebs {0} is correctly mounted".format(mount_dir))
-    result = remote_command_executor.run_remote_command("df | grep '{0}'".format(mount_dir))
+    logging.info("Checking efs {0} is correctly mounted".format(mount_dir))
+    result = remote_command_executor.run_remote_command("mount | column -t | grep '{0}'".format(mount_dir))
     assert_that(result.stdout).contains(mount_dir)
-
+    logging.info("Checking efs {0} enables in-transit encryption".format(mount_dir))
+    assert_that(result.stdout).contains("127.0.0.1:/")
+    logging.info("Checking efs {0} is successfully mounted in efs mount log".format(mount_dir))
+    result = remote_command_executor.run_remote_command(f"grep -E \"Successfully mounted.*{mount_dir}\" /var/log/amazon/efs/mount.log")
+    assert_that(result.stdout).contains(mount_dir)
+    logging.info("Checking efs {0} is correctly configured in fstab".format(mount_dir))
     result = remote_command_executor.run_remote_command("cat /etc/fstab")
-    assert_that(result.stdout).matches(
-        (
-            r".* {mount_dir} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,"
-            r"timeo=30,retrans=2,noresvport,_netdev 0 0"
-        ).format(mount_dir=mount_dir)
-    )
+    assert_that(result.stdout).matches(fr".* {mount_dir} efs tls,iam 0 0")
 
 
 # for FSX
