@@ -973,7 +973,7 @@ def vpc_stacks(cfn_stacks_factory, request):
             if len(az_list) < 2:
                 availability_zones = [None, None]
             else:
-                availability_zones = random.sample(az_list, k=2)
+                availability_zones = az_list
 
         # Subnets visual representation:
         # http://www.davidc.net/sites/default/subnets/subnets.html?network=192.168.0.0&mask=16&division=7.70
