@@ -965,7 +965,7 @@ def vpc_stacks(cfn_stacks_factory, request):
             # if only one AZ can be used for the given region, use it multiple times
             if len(az_names) == 1:
                 az_names *= 2
-            availability_zones = random.sample(az_names, k=2)
+            availability_zones = az_names
         # otherwise, select a subset of all AZs in the region
         else:
             az_list = get_availability_zones(region, credential)
