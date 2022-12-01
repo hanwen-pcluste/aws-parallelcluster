@@ -2037,12 +2037,19 @@ def test_shared_ebs_properties(
     assert_that(storage.availability_zone == availability_zone).is_true()
 
 
+class DummySharedEbs:
+    def __init__(self, name: str, availability_zone: str):
+        self.name = name
+        self.availability_zone = availability_zone
+        self.is_managed = False
+
+
 @pytest.mark.parametrize(
     "head_node_az, ebs_volumes, queues, subnet_az_mappings, failure_level, expected_messages",
     [
         (
             "us-east-1a",
-            [{"name": "vol-1", "az": "us-east-1a"}],
+            [DummySharedEbs("vol-1", "us-east-1a")],
             [
                 SlurmQueue(
                     name="different-az-queue-1",
@@ -2069,7 +2076,7 @@ def test_shared_ebs_properties(
         ),
         (
             "us-east-1b",
-            [{"name": "vol-1", "az": "us-east-1a"}],
+            [DummySharedEbs("vol-1", "us-east-1a")],
             [
                 SlurmQueue(
                     name="same-az-queue-1",
@@ -2096,9 +2103,9 @@ def test_shared_ebs_properties(
         (
             "us-east-1b",
             [
-                {"name": "vol-1", "az": "us-east-1a"},
-                {"name": "vol-2", "az": "us-east-1b"},
-                {"name": "vol-3", "az": "us-east-1c"},
+                DummySharedEbs("vol-1", "us-east-1a"),
+                DummySharedEbs("vol-2", "us-east-1b"),
+                DummySharedEbs("vol-3", "us-east-1c"),
             ],
             [
                 SlurmQueue(
@@ -2130,7 +2137,7 @@ def test_shared_ebs_properties(
         ),
         (
             "us-east-1a",
-            [{"name": "vol-1", "az": "us-east-1a"}],
+            [DummySharedEbs("vol-1", "us-east-1a")],
             [
                 SlurmQueue(
                     name="queue-1",

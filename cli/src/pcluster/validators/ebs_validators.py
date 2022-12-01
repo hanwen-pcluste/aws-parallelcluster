@@ -199,17 +199,20 @@ class MultiAzEbsVolumeValidator(Validator):
     def _validate(self, head_node_az: str, ebs_volumes, queues):
         cross_az_queues = set()
         for volume in ebs_volumes:
-            if volume["az"] != head_node_az:
+            # if the EBS volume is managed we set the AZ == to the HeadNode AZ otherwise we ask EC2 about
+            # the AZ where the existing volume is created
+            ebs_az = head_node_az if volume.is_managed else volume.availability_zone
+            if ebs_az != head_node_az:
                 self._add_failure(
                     "Your configuration includes an EBS volume '{0}' created in a different availability zone than "
                     "the Head Node. The volume and instance must be in the same availability "
-                    "zone.".format(volume["name"]),
+                    "zone.".format(volume.name),
                     FailureLevel.ERROR,
                 )
 
             for queue in queues:
                 queue_az_set = set(queue.networking.az_list)
-                if len(queue_az_set) > 1 or (set([volume["az"]]) != queue_az_set):
+                if len(queue_az_set) > 1 or ({ebs_az} != queue_az_set):
                     cross_az_queues.add(queue.name)
 
         if cross_az_queues:
