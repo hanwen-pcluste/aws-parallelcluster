@@ -619,6 +619,12 @@ def inject_additional_config_settings(  # noqa: C901
             request.config.getoption("custom_chef_cookbook"),
             ("DevSettings", "Cookbook", "ChefCookbook"),
         )
+    if not dict_has_nested_key(config_content, ("Iam", "ResourcePrefix")):
+        dict_add_nested_key(
+            config_content,
+            "/my-path-prefix/my-name-prefix",
+            ("Iam", "ResourcePrefix"),
+        )
 
     if request.config.getoption("custom_ami") and not dict_has_nested_key(config_content, ("Image", "CustomAmi")):
         dict_add_nested_key(config_content, request.config.getoption("custom_ami"), ("Image", "CustomAmi"))
