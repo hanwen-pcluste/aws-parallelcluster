@@ -1012,7 +1012,8 @@ def test_dynamic_file_systems_update(
     )
 
 
-def _create_shared_storages_resources(
+@pytest.fixture(scope="module")
+def create_shared_storages_resources(
     snapshots_factory,
     request,
     vpc_stack,
@@ -1022,50 +1023,57 @@ def _create_shared_storages_resources(
     fsx_factory,
     svm_factory,
     open_zfs_volume_factory,
-    bucket_name,
 ):
     """Create existing EBS, EFS, FSX resources for test."""
-    # create 1 existing ebs
-    ebs_volume_id = snapshots_factory.create_existing_volume(request, vpc_stack.cfn_outputs["PublicSubnetId"], region)
 
-    # create 1 efs
-    existing_efs_ids = efs_stack_factory(1)
-    efs_mount_target_stack_factory(existing_efs_ids)
-    existing_efs_id = existing_efs_ids[0]
+    shared_storage = []
 
-    # create 1 fsx lustre
-    import_path = "s3://{0}".format(bucket_name)
-    export_path = "s3://{0}/export_dir".format(bucket_name)
-    existing_fsx_lustre_fs_id = fsx_factory(
-        ports=[988],
-        ip_protocols=["tcp"],
-        num=1,
-        file_system_type="LUSTRE",
-        StorageCapacity=1200,
-        LustreConfiguration=LustreConfiguration(
-            title="lustreConfiguration",
-            ImportPath=import_path,
-            ExportPath=export_path,
-            DeploymentType="PERSISTENT_1",
-            PerUnitStorageThroughput=200,
-        ),
-    )[0]
+    def _create_shared_storages(bucket_name):
+        if shared_storage:
+            return shared_storage[0]
+        # create 1 existing ebs
+        ebs_volume_id = snapshots_factory.create_existing_volume(request, vpc_stack.cfn_outputs["PublicSubnetId"], region)
 
-    # create 1 fsx ontap
-    fsx_ontap_fs_id = create_fsx_ontap(fsx_factory, num=1)[0]
-    fsx_ontap_volume_id = svm_factory(fsx_ontap_fs_id, num_volumes=1)[0]
+        # create 1 efs
+        existing_efs_ids = efs_stack_factory(1)
+        efs_mount_target_stack_factory(existing_efs_ids)
+        existing_efs_id = existing_efs_ids[0]
 
-    # create 1 open zfs
-    fsx_open_zfs_root_volume_id = create_fsx_open_zfs(fsx_factory, num=1)[0]
-    fsx_open_zfs_volume_id = open_zfs_volume_factory(fsx_open_zfs_root_volume_id, num_volumes=1)[0]
+        # create 1 fsx lustre
+        import_path = "s3://{0}".format(bucket_name)
+        export_path = "s3://{0}/export_dir".format(bucket_name)
+        existing_fsx_lustre_fs_id = fsx_factory(
+            ports=[988],
+            ip_protocols=["tcp"],
+            num=1,
+            file_system_type="LUSTRE",
+            StorageCapacity=1200,
+            LustreConfiguration=LustreConfiguration(
+                title="lustreConfiguration",
+                ImportPath=import_path,
+                ExportPath=export_path,
+                DeploymentType="PERSISTENT_1",
+                PerUnitStorageThroughput=200,
+            ),
+        )[0]
 
-    return (
-        ebs_volume_id,
-        existing_efs_id,
-        existing_fsx_lustre_fs_id,
-        fsx_ontap_volume_id,
-        fsx_open_zfs_volume_id,
-    )
+        # create 1 fsx ontap
+        fsx_ontap_fs_id = create_fsx_ontap(fsx_factory, num=1)[0]
+        fsx_ontap_volume_id = svm_factory(fsx_ontap_fs_id, num_volumes=1)[0]
+
+        # create 1 open zfs
+        fsx_open_zfs_root_volume_id = create_fsx_open_zfs(fsx_factory, num=1)[0]
+        fsx_open_zfs_volume_id = open_zfs_volume_factory(fsx_open_zfs_root_volume_id, num_volumes=1)[0]
+
+        shared_storage.append(
+            ebs_volume_id,
+            existing_efs_id,
+            existing_fsx_lustre_fs_id,
+            fsx_ontap_volume_id,
+            fsx_open_zfs_volume_id,
+        )
+        return shared_storage[0]
+    yield _create_shared_storages
 
 
 def _test_directory_not_mounted(remote_command_executor, mount_dirs, node_type="head", node_name=None):

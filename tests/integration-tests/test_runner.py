@@ -434,7 +434,7 @@ def _join_with_not(args):
         yield current
 
 
-def _get_pytest_args(args, regions, log_file, out_dir):  # noqa: C901
+def _get_pytest_args(args, regions, log_file, out_dir, dist=""):  # noqa: C901
     pytest_args = ["-s", "-vv", "-l"]
 
     pytest_args.append("--tests-log-file={0}/{1}".format(args.output_dir, log_file))
@@ -497,6 +497,9 @@ def _get_pytest_args(args, regions, log_file, out_dir):  # noqa: C901
 
     if "html" in args.reports:
         pytest_args.append("--html={0}/{1}/results.html".format(args.output_dir, out_dir))
+
+    if dist:
+        pytest_args.append(f"--dist={dist}")
 
     _set_custom_packages_args(args, pytest_args)
     _set_ami_args(args, pytest_args)
@@ -597,6 +600,7 @@ def _get_pytest_regionalized_args(region, args, our_dir, logs_dir):
         regions=[region],
         log_file="{0}/{1}.log".format(logs_dir, region),
         out_dir="{0}/{1}".format(our_dir, region),
+        dist="loadscope"
     )
 
 
