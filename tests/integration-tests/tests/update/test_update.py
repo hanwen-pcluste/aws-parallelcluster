@@ -841,19 +841,14 @@ def test_dynamic_file_systems_update(
     os,
     pcluster_config_reader,
     ami_copy,
-    clusters_factory,
     scheduler_commands_factory,
     request,
-    snapshots_factory,
-    efs_stack_factory,
-    efs_mount_target_stack_factory,
     vpc_stack,
     key_name,
     s3_bucket_factory,
     test_datadir,
-    fsx_factory,
-    svm_factory,
-    open_zfs_volume_factory,
+    create_shared_storages_resources,
+    clusters_factory,
 ):
     """Test update shared storages."""
     existing_ebs_mount_dir = "/existing_ebs_mount_dir"
@@ -879,18 +874,7 @@ def test_dynamic_file_systems_update(
         existing_fsx_lustre_fs_id,
         existing_fsx_ontap_volume_id,
         existing_fsx_open_zfs_volume_id,
-    ) = _create_shared_storages_resources(
-        snapshots_factory,
-        request,
-        vpc_stack,
-        region,
-        efs_stack_factory,
-        efs_mount_target_stack_factory,
-        fsx_factory,
-        svm_factory,
-        open_zfs_volume_factory,
-        bucket_name,
-    )
+    ) = create_shared_storages_resources(bucket_name)
 
     # Create cluster with initial configuration
     init_config_file = pcluster_config_reader()
