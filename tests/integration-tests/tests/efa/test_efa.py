@@ -14,8 +14,8 @@ import re
 
 import pytest
 from assertpy import assert_that
-from remote_command_executor import RemoteCommandExecutor
-from utils import get_compute_nodes_instance_ids
+from remote_command_executor import RemoteCommandExecutor, RemoteCommandExecutionError
+from utils import get_compute_nodes_instance_ids, get_instance_info
 
 from tests.common.assertions import assert_no_errors_in_logs
 from tests.common.mpi_common import _test_mpi
@@ -65,6 +65,8 @@ def test_efa(
     logging.info("Running on Instances: {0}".format(get_compute_nodes_instance_ids(cluster.cfn_name, region)))
 
     run_system_analyzer(cluster, scheduler_commands_factory, request, partition="efa-enabled")
+
+    _test_fsx_performance_tuning_for_large_instances(instance, remote_command_executor)
 
     if instance in osu_benchmarks_instances:
         benchmark_failures = []
@@ -136,6 +138,23 @@ def _test_efa_installation(scheduler_commands, remote_command_executor, efa_inst
     # Check EFA interface not present on head node
     result = remote_command_executor.run_remote_command("lspci -n")
     assert_that(result.stdout).does_not_contain("1d0f:efa")
+
+
+def _test_fsx_performance_tuning_for_large_instances(instance_type, remote_command_executor):
+    instance_info = get_instance_info(instance_type)
+    vcpu = instance_info.get("VCpuInfo").get("DefaultVCpus")
+    memory = instance_info.get("MemoryInfo").get("SizeInMiB") # 256 GiB * 1024 = 262144 MiB
+    if vcpu > 64:
+        remote_command_executor.run_remote_command("lctl get_param osc.*OST*.max_rpcs_in_flight | grep 32$")
+        remote_command_executor.run_remote_command("lctl get_param mdc.*.max_rpcs_in_flight | grep 64$")
+        remote_command_executor.run_remote_command("lctl get_param mdc.*.max_mod_rpcs_in_flight | grep 50$")
+    else:
+        with pytest.raises(RemoteCommandExecutionError):
+            remote_command_executor.run_remote_command("lctl get_param osc.*OST*.max_rpcs_in_flight | grep 32$")
+        with pytest.raises(RemoteCommandExecutionError):
+            remote_command_executor.run_remote_command("lctl get_param mdc.*.max_rpcs_in_flight | grep 64$")
+        with pytest.raises(RemoteCommandExecutionError):
+            remote_command_executor.run_remote_command("lctl get_param mdc.*.max_mod_rpcs_in_flight | grep 50$")
 
 
 def _test_osu_benchmarks_pt2pt(
