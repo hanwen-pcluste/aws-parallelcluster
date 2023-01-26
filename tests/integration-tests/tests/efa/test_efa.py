@@ -143,7 +143,7 @@ def _test_efa_installation(scheduler_commands, remote_command_executor, efa_inst
 def _test_fsx_performance_tuning_for_large_instances(instance_type, remote_command_executor):
     instance_info = get_instance_info(instance_type)
     vcpu = instance_info.get("VCpuInfo").get("DefaultVCpus")
-    memory = instance_info.get("MemoryInfo").get("SizeInMiB") # 256 GiB * 1024 = 262144 MiB
+    memory_in_mib = instance_info.get("MemoryInfo").get("SizeInMiB") # 256 GiB * 1024 = 262144 MiB
     if vcpu > 64:
         remote_command_executor.run_remote_command("lctl get_param osc.*OST*.max_rpcs_in_flight | grep 32$")
         remote_command_executor.run_remote_command("lctl get_param mdc.*.max_rpcs_in_flight | grep 64$")
@@ -155,7 +155,8 @@ def _test_fsx_performance_tuning_for_large_instances(instance_type, remote_comma
             remote_command_executor.run_remote_command("lctl get_param mdc.*.max_rpcs_in_flight | grep 64$")
         with pytest.raises(RemoteCommandExecutionError):
             remote_command_executor.run_remote_command("lctl get_param mdc.*.max_mod_rpcs_in_flight | grep 50$")
-
+    if memory_in_mib > 262144 * 1.02: # 256 GiB with 2% tolerance between the declared/actual memory size
+        remote_command_executor.run_remote_command("sudo lctl llite.*.max_cached_mb | awk {}$")
 
 def _test_osu_benchmarks_pt2pt(
     mpi_version, remote_command_executor, scheduler_commands, test_datadir, instance, slots_per_instance, partition=None
