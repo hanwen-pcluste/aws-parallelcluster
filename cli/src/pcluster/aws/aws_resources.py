@@ -8,6 +8,8 @@
 # or in the "LICENSE.txt" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
 # OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions and
 # limitations under the License.
+from pcluster.aws.aws_api import AWSApi
+
 from pcluster.constants import (
     LUSTRE,
     OPENZFS,
@@ -37,6 +39,7 @@ class StackInfo:
         self._params = self._stack_data.get("Parameters", [])
         self.tags = self._stack_data.get("Tags", [])
         self.outputs = self._stack_data.get("Outputs", [])
+        self.__resources = None
 
     @property
     def id(self):
@@ -47,6 +50,13 @@ class StackInfo:
     def name(self):
         """Return the name of the stack."""
         return self._stack_data.get("StackName")
+
+    @property
+    def resources(self):
+        """Return the resources of the stack."""
+        if not self.__resources:
+            self.__resources = AWSApi.instance().cfn.describe_stack_resources(self.name)
+        return self.__resources
 
     @property
     def status(self):
@@ -89,6 +99,10 @@ class StackInfo:
         """
         param_value = next((par["ParameterValue"] for par in self._params if par["ParameterKey"] == key_name), None)
         return None if param_value is None else param_value.strip()
+
+    def get_resource(self, resource_logical_id: str):
+        """Return the resource information."""
+        return self.resources.get(resource_logical_id)
 
 
 class InstanceInfo:
