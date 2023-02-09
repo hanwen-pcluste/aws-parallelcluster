@@ -139,6 +139,7 @@ def pytest_addoption(parser):
     )
     parser.addoption("--api-uri", help="URI of an existing ParallelCluster API")
     parser.addoption("--instance-types-data-file", help="JSON file with additional instance types data")
+    parser.addoption("--pcluster-executable-path", help="Path to pcluster executable")
     parser.addoption(
         "--credential", help="STS credential endpoint, in the format <region>,<endpoint>,<ARN>,<externalId>.", nargs="+"
     )
@@ -380,7 +381,9 @@ def clusters_factory(request, region):
 
     The configs used to create clusters are dumped to output_dir/clusters_configs/{test_name}.config
     """
-    factory = ClustersFactory(delete_logs_on_success=request.config.getoption("delete_logs_on_success"))
+    pcluster_executable_path = request.config.getoption("pcluster_executable_path")
+    pcluster_executable_kwargs = {"pcluster_command": pcluster_executable_path} if pcluster_executable_path else {}
+    factory = ClustersFactory(delete_logs_on_success=request.config.getoption("delete_logs_on_success"), **pcluster_executable_kwargs)
 
     def _cluster_factory(cluster_config, upper_case_cluster_name=False, custom_cli_credentials=None, **kwargs):
         cluster_config = _write_config_to_outdir(request, cluster_config, "clusters_configs")
@@ -396,6 +399,7 @@ def clusters_factory(request, region):
             ssh_key=request.config.getoption("key_path"),
             region=region,
             custom_cli_credentials=custom_cli_credentials,
+            **pcluster_executable_kwargs
         )
         if not request.config.getoption("cluster"):
             cluster.creation_response = factory.create_cluster(cluster, **kwargs)

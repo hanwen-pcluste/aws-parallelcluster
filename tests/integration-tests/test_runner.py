@@ -79,6 +79,7 @@ TEST_DEFAULTS = {
     "delete_logs_on_success": False,
     "tests_root_dir": "./tests",
     "instance_types_data": None,
+    "pcluster_executable_path": None,
     "use_default_iam_credentials": False,
     "iam_user_role_stack_name": None,
     "directory_stack_name": None,
@@ -256,6 +257,11 @@ def _init_argparser():
         "instance_type -> data, where data must respect the same structure returned by ec2 "
         "describe-instance-types",
         default=TEST_DEFAULTS.get("instance_types_data"),
+    )
+    custom_group.add_argument(
+        "--pcluster-executable-path",
+        help="Path to pcluster executable",
+        default=TEST_DEFAULTS.get("pcluster_executable_path"),
     )
 
     ami_group = parser.add_argument_group("AMI selection parameters")
@@ -533,6 +539,9 @@ def _set_custom_packages_args(args, pytest_args):  # noqa: C901
 
     if args.post_install:
         pytest_args.extend(["--post-install", args.post_install])
+
+    if args.pcluster_executable_path:
+        pytest_args.extend(["--pcluster-executable-path", args.pcluster_executable_path])
 
 
 def _set_ami_args(args, pytest_args):

@@ -32,21 +32,21 @@ DCV_CONNECT_SCRIPT = "/opt/parallelcluster/scripts/pcluster_dcv_connect.sh"
 
 def test_dcv_configuration(region, instance, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir):
     _test_dcv_configuration(
-        8443, "0.0.0.0/0", region, instance, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir
+        8443, "0.0.0.0/0", region, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir, request
     )
 
 
 @pytest.mark.parametrize("dcv_port, access_from", [(8443, "0.0.0.0/0"), (5678, "192.168.1.1/32")])
 def test_dcv_with_remote_access(
-    dcv_port, access_from, region, instance, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir
+    dcv_port, access_from, region, instance, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir, request
 ):
     _test_dcv_configuration(
-        dcv_port, access_from, region, instance, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir
+        dcv_port, access_from, region, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir, request
     )
 
 
 def _test_dcv_configuration(
-    dcv_port, access_from, region, instance, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir
+    dcv_port, access_from, region, os, scheduler, pcluster_config_reader, clusters_factory, test_datadir, request
 ):
     dcv_authenticator_port = dcv_port + 1
     cluster_config = pcluster_config_reader(dcv_port=str(dcv_port), access_from=access_from)
@@ -65,8 +65,10 @@ def _test_dcv_configuration(
     add_keys_to_known_hosts(cluster.head_node_ip, host_keys_file)
 
     try:
+        pcluster_executable_path = request.config.getoption("pcluster_executable_path")
+        pcluster_command = pcluster_executable_path if pcluster_executable_path else "pcluster"
         result = run_pcluster_command(
-            ["pcluster", "dcv-connect", "--cluster-name", cluster.name, "--show-url"], env=env
+            [pcluster_command, "dcv-connect", "--cluster-name", cluster.name, "--show-url"], env=env
         )
     finally:
         # remove ssh key from jenkins user known hosts file

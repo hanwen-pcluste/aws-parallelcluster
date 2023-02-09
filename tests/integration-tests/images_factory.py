@@ -20,7 +20,7 @@ from utils import kebab_case
 class Image:
     """Contain all static and dynamic data related to an image instance."""
 
-    def __init__(self, image_id, config_file, region):
+    def __init__(self, image_id, config_file, region, pcluster_command="pcluster"):
         self.image_id = image_id
         self.config_file = config_file
         self.region = region
@@ -34,11 +34,11 @@ class Image:
         self.configuration_errors = None
         self.message = None
         self.ec2_image_id = None
+        self._pcluster_command = pcluster_command
 
-    @staticmethod
-    def list_images(**kwargs):
+    def list_images(self, **kwargs):
         """List images."""
-        command = ["pcluster", "list-images"]
+        command = [self._pcluster_command, "list-images"]
         for k, val in kwargs.items():
             command.extend([f"--{kebab_case(k)}", str(val)])
         result = run_pcluster_command(command)
@@ -51,7 +51,7 @@ class Image:
         log_error = kwargs.pop("log_error", True)
 
         command = [
-            "pcluster",
+            self._pcluster_command,
             "build-image",
             "--image-id",
             self.image_id,
@@ -87,7 +87,7 @@ class Image:
 
     def delete(self, force=False):
         """Delete image."""
-        command = ["pcluster", "delete-image", "--image-id", self.image_id, "--region", self.region]
+        command = [self._pcluster_command, "delete-image", "--image-id", self.image_id, "--region", self.region]
         if force:
             command.extend(["--force", "true"])
         result = run_pcluster_command(command)
@@ -101,7 +101,7 @@ class Image:
     def describe(self, log_on_error=False):
         """Describe image."""
         logging.info("Describe image %s in region %s.", self.image_id, self.region)
-        command = ["pcluster", "describe-image", "--image-id", self.image_id, "--region", self.region]
+        command = [self._pcluster_command, "describe-image", "--image-id", self.image_id, "--region", self.region]
         result = run_pcluster_command(command).stdout
         response = json.loads(result)
         if "message" in response and response["message"].startswith("No image or stack associated"):
@@ -114,7 +114,7 @@ class Image:
     def export_logs(self, **args):
         """Export the logs from the image build process."""
         logging.info("Get image %s build log.", self.image_id)
-        command = ["pcluster", "export-image-logs", "--region", self.region, "--image-id", self.image_id]
+        command = [self._pcluster_command, "export-image-logs", "--region", self.region, "--image-id", self.image_id]
         for k, val in args.items():
             command.extend([f"--{kebab_case(k)}", str(val)])
         result = run_pcluster_command(command)
@@ -124,7 +124,7 @@ class Image:
         """Get image build log events."""
         logging.info("Get image %s build log.", self.image_id)
         command = [
-            "pcluster",
+            self._pcluster_command,
             "get-image-log-events",
             "--image-id",
             self.image_id,
@@ -143,7 +143,7 @@ class Image:
     def get_stack_events(self, **args):
         """Get image build stack events."""
         logging.info("Get image %s build log.", self.image_id)
-        command = ["pcluster", "get-image-stack-events", "--region", self.region, "--image-id", self.image_id]
+        command = [self._pcluster_command, "get-image-stack-events", "--region", self.region, "--image-id", self.image_id]
         for k, val in args.items():
             command.extend([f"--{kebab_case(k)}", str(val)])
         result = run_pcluster_command(command).stdout
@@ -153,7 +153,7 @@ class Image:
     def list_log_streams(self):
         """Get image build log streams."""
         logging.info("Get image %s build log streams.", self.image_id)
-        command = ["pcluster", "list-image-log-streams", "--region", self.region, "--image-id", self.image_id]
+        command = [self._pcluster_command, "list-image-log-streams", "--region", self.region, "--image-id", self.image_id]
         result = run_pcluster_command(command).stdout
         response = json.loads(result)
         return response

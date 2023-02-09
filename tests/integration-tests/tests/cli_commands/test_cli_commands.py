@@ -52,7 +52,7 @@ def test_slurm_cli_commands(
 
     cluster = _test_create_cluster(clusters_factory, cluster_config, request)
     _test_describe_cluster(cluster)
-    _test_list_cluster(cluster.name, "CREATE_COMPLETE")
+    _test_list_cluster(cluster.name, "CREATE_COMPLETE", request)
 
     _test_update_with_warnings(cluster_config_with_warning, cluster)
     check_status(cluster, "CREATE_COMPLETE", "running", "RUNNING")
@@ -85,7 +85,7 @@ def _test_create_cluster(clusters_factory, cluster_config, request):
         "scheduler": {"type": "slurm"},
     }
     assert_that(cluster.creation_response.get("cluster")).is_equal_to(expected_creation_response)
-    _test_list_cluster(cluster.name, "CREATE_IN_PROGRESS")
+    _test_list_cluster(cluster.name, "CREATE_IN_PROGRESS", request)
     logging.info("Waiting for CloudFormation stack creation completion")
     cloud_formation = boto3.client("cloudformation")
     waiter = cloud_formation.get_waiter("stack_create_complete")
@@ -204,12 +204,14 @@ def _test_describe_cluster(cluster):
     assert_that(cluster_info).contains("scheduler")
 
 
-def _test_list_cluster(cluster_name, expected_status):
+def _test_list_cluster(cluster_name, expected_status, request):
     # Test the command response contains the cluster_name and expected_status.
     # ToDo: design test for this command to check stacks inside a region.
     #  It is hard because the test will be dependent on other tests
     logging.info("Testing list clusters")
-    cmd_args = ["pcluster", "list-clusters"]
+    pcluster_executable_path = request.config.getoption("pcluster_executable_path")
+    pcluster_command = pcluster_executable_path if pcluster_executable_path else "pcluster"
+    cmd_args = [pcluster_command, "list-clusters"]
     found_cluster = _find_cluster_with_pagination(cmd_args, cluster_name)
     assert_that(found_cluster).is_not_none()
     assert_that(found_cluster["cloudformationStackStatus"]).is_equal_to(expected_status)

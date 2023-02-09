@@ -44,7 +44,7 @@ def suppress_and_log_exception(func):
 class Cluster:
     """Contain all static and dynamic data related to a cluster instance."""
 
-    def __init__(self, name, ssh_key, config_file, region, custom_cli_credentials=None):
+    def __init__(self, name, ssh_key, config_file, region, custom_cli_credentials=None, pcluster_command="pcluster"):
         self.name = name
         self.config_file = config_file
         self.ssh_key = ssh_key
@@ -58,6 +58,7 @@ class Cluster:
         self.__cfn_resources = None
         self.__cfn_stack_arn = None
         self.custom_cli_credentials = custom_cli_credentials
+        self._pcluster_command = pcluster_command
 
     def __repr__(self):
         attrs = ", ".join(["{key}={value}".format(key=key, value=repr(value)) for key, value in self.__dict__.items()])
@@ -79,7 +80,7 @@ class Cluster:
         """
         # update the cluster
         logging.info("Updating cluster %s with config %s", self.name, config_file)
-        command = ["pcluster", "update-cluster", "--cluster-configuration", config_file, "--cluster-name", self.name]
+        command = [self._pcluster_command, "update-cluster", "--cluster-configuration", config_file, "--cluster-name", self.name]
         if kwargs.pop("wait", True):
             command.append("--wait")
         for k, val in kwargs.items():
@@ -119,7 +120,7 @@ class Cluster:
         """Delete this cluster."""
         if self.has_been_deleted:
             return
-        cmd_args = ["pcluster", "delete-cluster", "--cluster-name", self.name, "--wait"]
+        cmd_args = [self._pcluster_command, "delete-cluster", "--cluster-name", self.name, "--wait"]
         if delete_logs:
             logging.warning("Updating stack %s to delete CloudWatch logs on stack deletion.", self.name)
             try:
@@ -152,7 +153,7 @@ class Cluster:
 
     def start(self):
         """Run pcluster start and return the result."""
-        cmd_args = ["pcluster", "update-compute-fleet", "--cluster-name", self.name, "--status"]
+        cmd_args = [self._pcluster_command, "update-compute-fleet", "--cluster-name", self.name, "--status"]
         scheduler = self.config["Scheduling"]["Scheduler"]
         if scheduler == "awsbatch":
             cmd_args.append("ENABLED")
@@ -168,7 +169,7 @@ class Cluster:
 
     def stop(self):
         """Run pcluster stop and return the result."""
-        cmd_args = ["pcluster", "update-compute-fleet", "--cluster-name", self.name, "--status"]
+        cmd_args = [self._pcluster_command, "update-compute-fleet", "--cluster-name", self.name, "--status"]
         scheduler = self.config["Scheduling"]["Scheduler"]
         if scheduler == "awsbatch":
             cmd_args.append("DISABLED")
@@ -184,7 +185,7 @@ class Cluster:
 
     def describe_cluster(self):
         """Run pcluster describe-cluster and return the result."""
-        cmd_args = ["pcluster", "describe-cluster", "--cluster-name", self.name]
+        cmd_args = [self._pcluster_command, "describe-cluster", "--cluster-name", self.name]
         try:
             result = run_pcluster_command(cmd_args, log_error=False, custom_cli_credentials=self.custom_cli_credentials)
             response = json.loads(result.stdout)
@@ -196,7 +197,7 @@ class Cluster:
 
     def describe_compute_fleet(self):
         """Run pcluster describe-compute-fleet and return the result."""
-        cmd_args = ["pcluster", "describe-compute-fleet", "--cluster-name", self.name]
+        cmd_args = [self._pcluster_command, "describe-compute-fleet", "--cluster-name", self.name]
         try:
             result = run_pcluster_command(cmd_args, log_error=False, custom_cli_credentials=self.custom_cli_credentials)
             response = json.loads(result.stdout)
@@ -210,7 +211,7 @@ class Cluster:
 
     def describe_cluster_instances(self, node_type=None, queue_name=None):
         """Run pcluster describe-cluster-instances and return the result"""
-        cmd_args = ["pcluster", "describe-cluster-instances", "--cluster-name", self.name]
+        cmd_args = [self._pcluster_command, "describe-cluster-instances", "--cluster-name", self.name]
         if node_type:
             if node_type == "HeadNode":
                 node_type = "HeadNode"
@@ -237,7 +238,7 @@ class Cluster:
 
     def export_logs(self, bucket, output_file=None, bucket_prefix=None, filters=None):
         """Run pcluster export-cluster-logs and return the result."""
-        cmd_args = ["pcluster", "export-cluster-logs", "--cluster-name", self.name, "--bucket", bucket]
+        cmd_args = [self._pcluster_command, "export-cluster-logs", "--cluster-name", self.name, "--bucket", bucket]
         if output_file:
             cmd_args += ["--output-file", output_file]
         if bucket_prefix:
@@ -255,7 +256,7 @@ class Cluster:
 
     def list_log_streams(self, next_token=None):
         """Run pcluster list-cluster-logs and return the result."""
-        cmd_args = ["pcluster", "list-cluster-log-streams", "--cluster-name", self.name]
+        cmd_args = [self._pcluster_command, "list-cluster-log-streams", "--cluster-name", self.name]
         if next_token:
             cmd_args.extend(["--next-token", next_token])
         try:
@@ -281,7 +282,7 @@ class Cluster:
 
     def get_log_events(self, log_stream, **args):
         """Run pcluster get-cluster-log-events and return the result."""
-        cmd_args = ["pcluster", "get-cluster-log-events", "--cluster-name", self.name, "--log-stream-name", log_stream]
+        cmd_args = [self._pcluster_command, "get-cluster-log-events", "--cluster-name", self.name, "--log-stream-name", log_stream]
         for k, val in args.items():
             if val is not None:
                 cmd_args.extend([f"--{kebab_case(k)}", str(val)])
@@ -297,7 +298,7 @@ class Cluster:
 
     def get_stack_events(self, **args):
         """Run pcluster get-cluster-log-events and return the result."""
-        cmd_args = ["pcluster", "get-cluster-stack-events", "--cluster-name", self.name]
+        cmd_args = [self._pcluster_command, "get-cluster-stack-events", "--cluster-name", self.name]
         for k, val in args.items():
             cmd_args.extend([f"--{kebab_case(k)}", str(val)])
 
@@ -405,9 +406,10 @@ class Cluster:
 class ClustersFactory:
     """Manage creation and destruction of pcluster clusters."""
 
-    def __init__(self, delete_logs_on_success=False):
+    def __init__(self, delete_logs_on_success=False, pcluster_command="pcluster"):
         self.__created_clusters = {}
         self._delete_logs_on_success = delete_logs_on_success
+        self._pcluster_command = pcluster_command
 
     def create_cluster(self, cluster, log_error=True, raise_on_error=True, **kwargs):
         """
@@ -454,10 +456,9 @@ class ClustersFactory:
             except Exception:
                 pass
 
-    @staticmethod
-    def _build_command(cluster, kwargs):
+    def _build_command(self, cluster, kwargs):
         command = [
-            "pcluster",
+            self._pcluster_command,
             "create-cluster",
             "--rollback-on-failure",
             "false",
