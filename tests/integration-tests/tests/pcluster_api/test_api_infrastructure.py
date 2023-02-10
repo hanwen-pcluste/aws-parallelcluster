@@ -42,7 +42,7 @@ def api_with_default_settings(api_infrastructure_s3_uri, public_ecr_image_uri, a
     template = (
         api_infrastructure_s3_uri
         or f"https://{region}-aws-parallelcluster.s3.{region}.amazonaws.com{'.cn' if region.startswith('cn') else ''}"
-        f"/parallelcluster/{get_installed_parallelcluster_version()}/api/parallelcluster-api.yaml"
+        f"/parallelcluster/{get_installed_parallelcluster_version(request)}/api/parallelcluster-api.yaml"
     )
     logging.info(f"Creating API Server stack in {region} with template {template}")
     stack = CfnStack(

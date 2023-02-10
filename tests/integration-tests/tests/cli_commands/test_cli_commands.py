@@ -80,7 +80,7 @@ def _test_create_cluster(clusters_factory, cluster_config, request):
         "cloudformationStackStatus": "CREATE_IN_PROGRESS",
         "cloudformationStackArn": cluster.cfn_stack_arn,
         "region": cluster.region,
-        "version": get_installed_parallelcluster_version(),
+        "version": get_installed_parallelcluster_version(request),
         "clusterStatus": "CREATE_IN_PROGRESS",
         "scheduler": {"type": "slurm"},
     }

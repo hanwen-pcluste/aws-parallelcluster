@@ -174,7 +174,7 @@ def test_scheduler_plugin_integration(
 
     # Tests:
     # Test even handler execution
-    _test_event_handler_execution(cluster, region, os, architecture, command_executor, head_node, compute_node)
+    _test_event_handler_execution(cluster, region, os, architecture, command_executor, head_node, compute_node, request)
     # Test artifacts are downloaded
     _test_artifacts_download(command_executor)
     # Test artifacts shared from head to compute node
@@ -267,7 +267,7 @@ def _wait_compute_cloudinit_done(command_executor, compute_node):
     assert_that(compute_cloudinit_status_output).contains("status: done")
 
 
-def _test_event_handler_execution(cluster, region, os, architecture, command_executor, head_node, compute_node):
+def _test_event_handler_execution(cluster, region, os, architecture, command_executor, head_node, compute_node, request):
     """Test event handler execution and environment"""
     head_scheduler_plugin_log_output = command_executor.run_remote_command(
         f"sudo cat {SCHEDULER_PLUGIN_LOG_OUT_PATH}"
@@ -282,7 +282,7 @@ def _test_event_handler_execution(cluster, region, os, architecture, command_exe
     for event in ["HeadInit", "HeadConfigure", "HeadFinalize", "HeadClusterUpdate"]:
         assert_that(head_scheduler_plugin_log_output).contains(f"[{event}] - INFO: {event} executed")
         _test_event_handler_environment(
-            cluster, region, os, architecture, event, head_scheduler_plugin_log_output, head_node, python_root, "head"
+            cluster, region, os, architecture, event, head_scheduler_plugin_log_output, head_node, python_root, "head", request
         )
 
     compute_node_private_ip = compute_node.get("privateIpAddress")
@@ -301,11 +301,12 @@ def _test_event_handler_execution(cluster, region, os, architecture, command_exe
             head_node,
             python_root,
             "compute",
+            request
         )
 
 
 def _test_event_handler_environment(
-    cluster, region, os, architecture, event, log_output, head_node, python_root, node_type
+    cluster, region, os, architecture, event, log_output, head_node, python_root, node_type, request
 ):
     """Test event handler environment"""
     vars = [
@@ -322,7 +323,7 @@ def _test_event_handler_environment(
         f"AWS_REGION={region}",
         f"PCLUSTER_OS={os}",
         f"PCLUSTER_ARCH={architecture}",
-        f"PCLUSTER_VERSION={get_installed_parallelcluster_version()}",
+        f"PCLUSTER_VERSION={get_installed_parallelcluster_version(request)}",
         f"PCLUSTER_HEADNODE_PRIVATE_IP={head_node.get('PrivateIpAddress')}",
         f"PCLUSTER_HEADNODE_HOSTNAME={head_node.get('PrivateDnsName').split('.')[0]}",
         f"PCLUSTER_PYTHON_ROOT={python_root}",

@@ -78,7 +78,7 @@ def retrieve_latest_ami(region, os, ami_type="official", architecture="x86_64", 
     try:
         if ami_type == "pcluster":
             ami_name = "aws-parallelcluster-{version}-{ami_name}".format(
-                version=get_installed_parallelcluster_version(),
+                version=get_installed_parallelcluster_version(request),
                 ami_name=AMI_TYPE_DICT.get(ami_type).get(os).get("name"),
             )
             if (
@@ -168,13 +168,13 @@ def _assert_ami_is_available(region, ami_id):
     assert_that(ami_state).is_equal_to("available")
 
 
-def get_installed_parallelcluster_version():
+def get_installed_parallelcluster_version(request):
     """Get the version of the installed aws-parallelcluster package."""
     return pkg_resources.get_distribution("aws-parallelcluster").version
 
 
-def get_installed_parallelcluster_base_version():
-    return pkg_resources.packaging.version.parse(get_installed_parallelcluster_version()).base_version
+def get_installed_parallelcluster_base_version(request):
+    return pkg_resources.packaging.version.parse(get_installed_parallelcluster_version(request)).base_version
 
 
 def get_sts_endpoint(region):
