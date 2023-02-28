@@ -301,6 +301,8 @@ def check_fsx(
     fsx_ids = get_fsx_ids(cluster, region)
     logging.info("Checking the length of mount dirs is the same as the length of FSXIDs")
     assert_that(len(mount_dirs)).is_equal_to(len(fsx_ids))
+    logging.info("Checking Lustre client version")
+    remote_command_executor.run_remote_command("lfs --version | grep 2.12")
     for mount_dir, fsx_id in zip(mount_dirs, fsx_ids):
         logging.info("Checking %s on %s", fsx_id, mount_dir)
         file_system_type = get_file_system_type(fsx_id, region)
