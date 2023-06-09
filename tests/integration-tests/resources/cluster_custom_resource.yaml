@@ -55,9 +55,6 @@ Resources:
         Tags:
           - Key: inside_configuration_key
             Value: overridden
-        DevSettings:
-          AmiSearchFilters:
-            Owner: self
         Image:
           Os: !Ref Os
         HeadNode:
