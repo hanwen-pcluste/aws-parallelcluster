@@ -167,9 +167,9 @@ def resource_bucket_cluster_template_fixture(policies_template_path, resource_bu
         PolicyDocument={
             "Statement": [
                 {
-                    "Action": ["s3:*"],
+                    "Action": ["s3:GetObject"],
                     "Effect": "Allow",
-                    "Resource": {"Fn::Sub": f"arn:${{AWS::Partition}}:s3:::*"},
+                    "Resource": {"Fn::Sub": f"arn:${{AWS::Partition}}:s3:::{resource_bucket}/*"},
                 },
                 {
                     "Action": ["events:PutRule", "events:DeleteRule", "events:PutTargets", "events:RemoveTargets"],
