@@ -163,7 +163,7 @@ def test_cluster_update_invalid(region, cluster_custom_resource_factory, update_
     parameters = [{"ParameterKey": k, "ParameterValue": v} for k, v in update_params.items()]
 
     with pytest.raises(StackError) as stack_error:
-        stack.factory.update_stack(stack.name, stack.region, parameters, stack_is_under_test=True)
+        stack.factory.update_stack(stack.name, stack.region, parameters, stack_is_under_test=True, wait_for_rollback=True)
 
     reason = failure_reason(stack_error.value.stack_events)
     assert_that(reason).contains(error_message)
