@@ -30,11 +30,7 @@ Resources:
       Parameters:
         CustomBucket: !If [ UseCustomBucket, !FindInMap [ParallelCluster, Constants, Bucket], !Ref AWS::NoValue ]
         AdditionalIamPolicies: !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
-      TemplateURL: !Sub
-        - https://${Bucket}.s3.${AWS::Region}.${AWS::URLSuffix}/parallelcluster/${Version}/templates/custom_resource/cluster.yaml
-        - { Version: !FindInMap [ParallelCluster, Constants, Version ],
-            Bucket: !If [ UseCustomBucket, !FindInMap [ParallelCluster, Constants, Bucket], !Sub "${AWS::Region}-aws-parallelcluster" ]
-          }
+      TemplateURL: https://aws-parallelcluster-dev-commercial.s3.amazonaws.com/parallelcluster/3.6.0/templates/custom_resource/cluster.yaml
 
   PclusterVpc:
     Type: AWS::CloudFormation::Stack
