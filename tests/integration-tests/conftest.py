@@ -15,7 +15,7 @@
 
 import json
 import logging
-import os
+import os as os_lib
 import re
 from functools import partial
 from itertools import product
@@ -229,14 +229,14 @@ def pytest_sessionstart(session):
     # When attempting to retrieve credentials on an Amazon EC2 instance that is configured with an IAM role,
     # a connection to the instance metadata service will time out after 1 second by default. If you know you're
     # running on an EC2 instance with an IAM role configured, you can increase this value if needed.
-    os.environ["AWS_METADATA_SERVICE_TIMEOUT"] = "5"
+    os_lib.environ["AWS_METADATA_SERVICE_TIMEOUT"] = "5"
     # When attempting to retrieve credentials on an Amazon EC2 instance that has been configured with an IAM role,
     # Boto3 will make only one attempt to retrieve credentials from the instance metadata service before giving up.
     # If you know your code will be running on an EC2 instance, you can increase this value to make Boto3 retry
     # multiple times before giving up.
-    os.environ["AWS_METADATA_SERVICE_NUM_ATTEMPTS"] = "5"
+    os_lib.environ["AWS_METADATA_SERVICE_NUM_ATTEMPTS"] = "5"
     # Increasing default max attempts retry
-    os.environ["AWS_MAX_ATTEMPTS"] = "10"
+    os_lib.environ["AWS_MAX_ATTEMPTS"] = "10"
 
 
 def pytest_runtest_logstart(nodeid: str, location: Tuple[str, Optional[int], str]):
@@ -327,7 +327,7 @@ def pytest_exception_interact(node, call, report):
 
 def _extract_tested_component_from_filename(item):
     """Extract portion of test item's filename identifying the component it tests."""
-    test_location = os.path.splitext(os.path.basename(item.location[0]))[0]
+    test_location = os_lib.path.splitext(os_lib.path.basename(item.location[0]))[0]
     return re.sub(r"test_|_test", "", test_location)
 
 
@@ -522,9 +522,9 @@ def _write_config_to_outdir(request, config, config_dir):
     test_file, test_name = request.node.nodeid.split("::", 1)
     config_file_name = "{0}-{1}".format(test_file, test_name.replace("/", "_"))
 
-    os.makedirs(
+    os_lib.makedirs(
         "{out_dir}/{config_dir}/{test_dir}".format(
-            out_dir=out_dir, config_dir=config_dir, test_dir=os.path.dirname(test_file)
+            out_dir=out_dir, config_dir=config_dir, test_dir=os_lib.path.dirname(test_file)
         ),
         exist_ok=True,
     )
@@ -552,7 +552,7 @@ def test_datadir(request, datadir):
 
 
 @pytest.fixture()
-def pcluster_config_reader(test_datadir, vpc_stack, request, region, scheduler_plugin_configuration):
+def pcluster_config_reader(test_datadir, vpc_stack, request, region, os, architecture, scheduler_plugin_configuration):
     """
     Define a fixture to render pcluster config templates associated to the running test.
 
@@ -570,17 +570,17 @@ def pcluster_config_reader(test_datadir, vpc_stack, request, region, scheduler_p
 
     def _config_renderer(config_file="pcluster.config.yaml", benchmarks=None, output_file=None, **kwargs):
         config_file_path = test_datadir / config_file
-        if not os.path.isfile(config_file_path):
+        if not os_lib.path.isfile(config_file_path):
             raise FileNotFoundError(f"Cluster config file not found in the expected dir {config_file_path}")
         output_file_path = test_datadir / output_file if output_file else config_file_path
         default_values = _get_default_template_values(vpc_stack, request)
         file_loader = FileSystemLoader(str(test_datadir))
         env = SandboxedEnvironment(loader=file_loader)
-        rendered_template = env.get_template(config_file).render(**{**default_values, **kwargs})
+        rendered_template = env.get_template(config_file).render(**{**default_values, **kwargs, **{"os": os.split("-dlami")[0]}})
         output_file_path.write_text(rendered_template)
         if not config_file.endswith("image.config.yaml"):
             inject_additional_config_settings(
-                output_file_path, request, region, benchmarks, scheduler_plugin_configuration
+                output_file_path, request, region, os, architecture, benchmarks, scheduler_plugin_configuration
             )
         else:
             inject_additional_image_configs_settings(output_file_path, request)
@@ -617,7 +617,7 @@ def inject_additional_image_configs_settings(image_config, request):
 
 
 def inject_additional_config_settings(  # noqa: C901
-    cluster_config, request, region, benchmarks=None, scheduler_plugin_configuration=None
+    cluster_config, request, region, os, architecture, benchmarks=None, scheduler_plugin_configuration=None
 ):  # noqa C901
     with open(cluster_config, encoding="utf-8") as conf_file:
         config_content = yaml.safe_load(conf_file)
@@ -647,6 +647,17 @@ def inject_additional_config_settings(  # noqa: C901
 
     if request.config.getoption("custom_ami") and not dict_has_nested_key(config_content, ("Image", "CustomAmi")):
         dict_add_nested_key(config_content, request.config.getoption("custom_ami"), ("Image", "CustomAmi"))
+
+    if "-dlami" in os:
+        owner = filters.owner if filters and filters.owner else "amazon"
+        tags = filters.tags if filters and filters.tags else []
+
+        filters = [{"Name": "name", "Values": [f"dlami-aws-parallelcluster-3.6.1-amzn2-hvm-x86_64*"]}]
+        filters.extend([{"Name": f"tag:{tag.key}", "Values": [tag.value]} for tag in tags])
+        images = self._client.describe_images(Owners=[owner], Filters=filters, IncludeDeprecated=True).get("Images")
+        if not images:
+            raise AWSClientError(function_name="describe_images", message="Cannot find official ParallelCluster AMI")
+        return self._find_valid_official_image(images).get("ImageId")
 
     if not dict_has_nested_key(config_content, ("DevSettings", "AmiSearchFilters")):
         if (
@@ -840,9 +851,9 @@ def setup_credentials(region, request):
 @pytest.fixture(scope="class", autouse=True)
 def setup_env_variable(region):
     """Setup environment for the integ tests"""
-    os.environ["AWS_DEFAULT_REGION"] = region
+    os_lib.environ["AWS_DEFAULT_REGION"] = region
     yield
-    del os.environ["AWS_DEFAULT_REGION"]
+    del os_lib.environ["AWS_DEFAULT_REGION"]
 
 
 @xdist_session_fixture(autouse=True)
@@ -854,7 +865,7 @@ def initialize_cli_creds(request):
         stack_factory = CfnStacksFactory(request.config.getoption("credential"))
 
         regions = request.config.getoption("regions") or get_all_regions(request.config.getoption("tests_config"))
-        stack_template_path = os.path.join("..", "iam_policies", "user-role.cfn.yaml")
+        stack_template_path = os_lib.path.join("..", "iam_policies", "user-role.cfn.yaml")
         with open(stack_template_path, encoding="utf-8") as stack_template_file:
             stack_template_data = stack_template_file.read()
         cli_creds = {}
@@ -903,7 +914,7 @@ def create_roles_stack(request, region):
     factory = CfnStacksFactory(request.config.getoption("credential"))
 
     def _create_stack(stack_prefix, roles_file):
-        stack_template_path = os.path.join("..", "iam_policies", roles_file)
+        stack_template_path = os_lib.path.join("..", "iam_policies", roles_file)
         template_data = read_template(stack_template_path)
         stack = CfnStack(
             name=generate_stack_name(stack_prefix, request.config.getoption("stackname_suffix")),
@@ -1043,7 +1054,7 @@ def scheduler_plugin_definitions(s3_bucket_factory_shared, request) -> dict:
         for plugin_name in plugins:
             plugin = plugins.get(plugin_name)
             scheduler_definition = plugin.get("scheduler-definition")
-            if os.path.isfile(scheduler_definition):
+            if os_lib.path.isfile(scheduler_definition):
                 logging.info(
                     "Found scheduler-definition (%s) for scheduler plugin (%s)", scheduler_definition, plugin_name
                 )
@@ -1098,9 +1109,9 @@ def serial_execution_by_instance(request, instance):
         lock = FileLock(lock_file=lock_file)
         logging.info("Acquiring lock file %s", lock.lock_file)
         with lock.acquire(poll_interval=15, timeout=12000):
-            logging.info(f"The lock is acquired by worker ID {get_xdist_worker_id(request)}: {os.getpid()}")
+            logging.info(f"The lock is acquired by worker ID {get_xdist_worker_id(request)}: {os_lib.getpid()}")
             yield
-        logging.info(f"Releasing lock file {lock.lock_file} by {get_xdist_worker_id(request)}: {os.getpid()}")
+        logging.info(f"Releasing lock file {lock.lock_file} by {get_xdist_worker_id(request)}: {os_lib.getpid()}")
         lock.release()
     else:
         logging.info("Ignoring serial execution for instance %s", instance)
