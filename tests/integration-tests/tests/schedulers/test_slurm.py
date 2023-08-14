@@ -67,7 +67,7 @@ def test_slurm(
     Grouped all tests in a single function so that cluster can be reused for all of them.
     """
     scaledown_idletime = 3
-    gpu_instance_type = "g3.4xlarge"
+    gpu_instance_type = "p5.48xlarge"
     gpu_instance_type_info = get_instance_info(gpu_instance_type, region)
     # For OSs running _test_mpi_job_termination, spin up 2 compute nodes at cluster creation to run test
     # Else do not spin up compute node and start running regular slurm tests
@@ -111,7 +111,7 @@ def test_slurm(
         instance_type=gpu_instance_type,
         max_count=5,
         gpu_per_instance=_get_num_gpus_on_instance(gpu_instance_type_info),
-        gpu_type="m60",
+        gpu_type="h100",
     )
     # Test torque command wrapper
     _test_torque_job_submit(remote_command_executor, test_datadir)

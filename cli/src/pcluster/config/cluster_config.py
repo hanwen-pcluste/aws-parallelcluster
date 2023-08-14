@@ -644,7 +644,7 @@ class HeadNodeNetworking(_BaseNetworking):
     def __init__(self, subnet_id: str, elastic_ip: Union[str, bool] = None, proxy: Proxy = None, **kwargs):
         super().__init__(**kwargs)
         self.subnet_id = Resource.init_param(subnet_id)
-        self.elastic_ip = Resource.init_param(elastic_ip)
+        self.elastic_ip = Resource.init_param(elastic_ip, default=True)
         self.proxy = proxy
 
     def _register_validators(self, context: ValidatorContext = None):

@@ -10,7 +10,7 @@ FABTESTS_DIR="$1"
 FABTESTS_REPO="https://github.com/ofiwg/libfabric.git"
 # TODO We should target the release 1.16.0 instead of a commit.
 # We must fix this once that version will be released.
-FABTESTS_COMMIT="840a4a93ccf576b950dfd15d979cbf5f06e9c64b"
+FABTESTS_COMMIT="a2585866c48f041ad941ab503a651d474b9a6d7b"
 FABTESTS_SOURCES_DIR="$FABTESTS_DIR/sources"
 LIBFABRIC_DIR="/opt/amazon/efa"
 CUDA_DIR="/usr/local/cuda"

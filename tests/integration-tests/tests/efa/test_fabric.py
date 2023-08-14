@@ -74,7 +74,7 @@ def _execute_fabtests(remote_command_executor, test_datadir, instance):
     )
 
     logging.info("Running Fabtests")
-    test_cases = FABTESTS_BASIC_TESTS + FABTESTS_GDRCOPY_TESTS if instance == "p4d.24xlarge" else FABTESTS_BASIC_TESTS
+    test_cases = FABTESTS_BASIC_TESTS + FABTESTS_GDRCOPY_TESTS if instance in ["p4d.24xlarge", "p5.48xlarge"] else FABTESTS_BASIC_TESTS
     remote_command_executor.run_remote_script(
         str(test_datadir / "run-fabtests.sh"),
         args=[

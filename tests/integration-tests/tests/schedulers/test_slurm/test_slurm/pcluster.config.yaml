@@ -26,7 +26,7 @@ Scheduling:
           InstanceType: c4.xlarge
           {% else %}
           Instances:
-            - InstanceType: c4.xlarge
+            - InstanceType: p5.48xlarge
           {% endif %}
         - Name: same-name-diff-queue
           {% if scheduler == "plugin" %}
