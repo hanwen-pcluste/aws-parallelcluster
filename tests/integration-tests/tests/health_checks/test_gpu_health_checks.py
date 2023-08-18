@@ -101,7 +101,7 @@ def test_cluster_with_gpu_health_checks(
             node_health_status.latest_job = job_id
 
     # Wait for all jobs to be completed
-    slurm_commands.wait_job_queue_empty(timeout=40)
+    slurm_commands.wait_job_queue_empty()
 
     # Check if GPU Health Checks Manager was started on all nodes and actual Health Checks executed for nodes where
     # its enabled and the instance type is GPU-enabled.
@@ -163,7 +163,7 @@ def _test_failing_gpu_health_checks(
 
     # Assert that the node is replaced and job is executed
     slurm_commands.wait_nodes_status("idle", filter_by_nodes=[target_node.node_name])
-    slurm_commands.wait_job_queue_empty(timeout=40)
+    slurm_commands.wait_job_queue_empty()
 
     # Confirm health check was successful
     _assert_file_content_in_compute_node(
