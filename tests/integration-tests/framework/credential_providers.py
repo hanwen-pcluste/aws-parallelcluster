@@ -64,7 +64,10 @@ def sts_credential_provider(region, credential_arn, credential_external_id=None,
     credentials_to_backup = _get_current_credentials()
     logging.info(f"caller arnnnnnnnnnnnnn: {caller_arn}")
     logging.info(f"credential arnnnnnnnnnnnnn: {credential_arn}")
-    if caller_arn.startswith(f"{credential_arn}/") or caller_arn == credential_arn:
+    caller_arn_split = re.split(":|/", caller_arn)
+    credential_arn_split = re.split(":|/", credential_arn)
+    if caller_arn_split[4] == credential_arn_split[4] and caller_arn_split[6] == credential_arn_split[6]:
+        # If account id and role name is the same, the role do not need to / cannot assume itself
         logging.info("Using current credentials")
         yield credentials_to_backup
     else:
