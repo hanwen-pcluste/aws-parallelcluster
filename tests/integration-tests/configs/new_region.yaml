@@ -1,5 +1,5 @@
 {%- import 'common.jinja2' as common -%}
-{%- set NEW_REGION = ["##PLACEHOLDER##"] -%}
+{%- set NEW_REGION = ["il-central-1"] -%}
 ---
 test-suites:
   scaling:
