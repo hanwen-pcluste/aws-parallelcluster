@@ -62,6 +62,8 @@ def sts_credential_provider(region, credential_arn, credential_external_id=None,
         sts = boto3.client("sts", region_name=region)
     caller_arn = sts.get_caller_identity()["Arn"]
     credentials_to_backup = _get_current_credentials()
+    logging.info(f"caller arnnnnnnnnnnnnn: {caller_arn}")
+    logging.info(f"credential arnnnnnnnnnnnnn: {credential_arn}")
     if caller_arn.startswith(f"{credential_arn}/") or caller_arn == credential_arn:
         logging.info("Using current credentials")
         yield credentials_to_backup
