@@ -94,12 +94,7 @@ SharedStorage:
     StorageType: Ebs
     EbsSettings:
       Size: {{ volume_sizes[2] }}
-      {% if "-iso" in region %}
       VolumeType: gp3
-      {% else %}
-      VolumeType: io2
-      Iops: 150
-      {% endif %}
   - MountDir: {{ mount_dirs[3] }}
     Name: ebs4
     StorageType: Ebs

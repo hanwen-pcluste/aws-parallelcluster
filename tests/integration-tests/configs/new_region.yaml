@@ -154,3 +154,17 @@ test-suites:
           instances: {{ common.INSTANCES_DEFAULT_X86 }}
           oss: ["alinux2"]
           schedulers: ["slurm"]
+  disable_hyperthreading:
+    test_disable_hyperthreading.py::test_hit_disable_hyperthreading:
+      dimensions:
+        - regions: {{ NEW_REGION }}
+          instances: [ "c5.xlarge" ]
+          oss: [ "ubuntu2204" ]
+          schedulers: [ "slurm" ]
+          benchmarks:
+            - mpi_variants: [ "openmpi", "intelmpi" ]
+              num_instances: [ 5 ] # Change the head node instance type if you'd test more than 30 instances
+              slots_per_instance: 2
+              partition: "ht-disabled"
+              osu_benchmarks:
+                collective: [ "osu_allreduce", "osu_alltoall" ]
