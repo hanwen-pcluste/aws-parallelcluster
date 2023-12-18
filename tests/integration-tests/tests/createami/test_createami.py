@@ -119,10 +119,7 @@ def test_build_image(
     bucket_name = s3_bucket_factory()
 
     # Get base AMI
-    # remarkable AMIs are not available for ARM and ubuntu2204, centos7 yet
-    if os not in ["ubuntu2204", "centos7"]:
-        base_ami = retrieve_latest_ami(region, os, ami_type="remarkable", architecture=architecture)
-    elif os in ["ubuntu2204"]:
+    if os in ["ubuntu2204"]:
         base_ami = retrieve_latest_ami(
             region,
             os,
