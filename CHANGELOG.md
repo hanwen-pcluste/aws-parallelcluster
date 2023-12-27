@@ -9,6 +9,8 @@ CHANGELOG
   stop the compute fleet. It's now possible to update them by setting `Scheduling/SlurmSettings/QueueUpdateStrategy`
   to TERMINATE. ParallelCluster will terminate only the nodes removed during a resize of the cluster capacity
   performed through a cluster update.
+- Add support for RHEL9.
+- Add support for Rocky Linux 9 as `CustomAmi` created through `build-image` process. No public official ParallelCluster Rocky9 Linux AMI is made available at this time.
 - Add support for installing Intel OneAPI Base Toolkit and HPC Toolkit, and Intel Python.
   - Intel OneAPI Base Toolkits: 2023.2.0
   - Intel OneAPI HPC Toolkits: 2023.2.0
