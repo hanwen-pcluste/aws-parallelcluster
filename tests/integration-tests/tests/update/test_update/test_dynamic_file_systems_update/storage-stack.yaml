@@ -86,6 +86,7 @@ Resources:
     Condition: CreateFsx
     Properties:
       FileSystemType: LUSTRE
+      FileSystemTypeVersion: '2.12'
       LustreConfiguration:
         DeploymentType: PERSISTENT_1
         ExportPath: !Ref ExportPathParam
