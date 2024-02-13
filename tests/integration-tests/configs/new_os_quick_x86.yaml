@@ -14,13 +14,6 @@ test-suites:
       dimensions:
         - regions: ["us-west-2"]
           oss: {{ NEW_OS }}
-  cfn-init:
-    test_cfn_init.py::test_replace_compute_on_failure:
-      dimensions:
-        - regions: ["eu-west-1"]
-          instances: {{ common.INSTANCES_DEFAULT_X86 }}
-          oss: {{ NEW_OS }}
-          schedulers: [ "slurm" ]
   cli_commands:
     test_cli_commands.py::test_slurm_cli_commands:
       dimensions:
@@ -207,3 +200,35 @@ test-suites:
           schedulers: [ "slurm" ]
           oss: {{ NEW_OS }}
           instances: {{ common.INSTANCES_DEFAULT_X86 }}
+  create:
+    test_create.py::test_create_imds_secured:
+      dimensions:
+        - regions: [ "eu-south-1" ]
+          instances: {{ common.INSTANCES_DEFAULT_X86 }}
+          oss: {{ NEW_OS }}
+          schedulers: [ "slurm" ]
+    test_create.py::test_cluster_creation_with_problematic_preinstall_script:
+      dimensions:
+        - regions: [ "ap-south-1" ]
+          instances: {{ common.INSTANCES_DEFAULT_ARM }}
+          schedulers: [ "slurm" ]
+          oss: {{ NEW_OS }}
+    test_create.py::test_cluster_creation_with_invalid_ebs:
+      dimensions:
+        - regions: [ "ap-south-1" ]
+          instances: {{ common.INSTANCES_DEFAULT_ARM }}
+          schedulers: [ "slurm" ]
+          oss: {{ NEW_OS }}
+    test_create.py::test_create_disable_sudo_access_for_default_user:
+      dimensions:
+        - regions: [ "ap-northeast-2" ]
+          instances: {{ common.INSTANCES_DEFAULT_X86 }}
+          schedulers: [ "slurm" ]
+          oss: {{ NEW_OS }}
+  users:
+    test_default_user_home.py::test_default_user_local_home:
+      dimensions:
+        - oss: [ "alinux2" ]
+          regions: [ "us-west-2" ]
+          instances: {{ common.INSTANCES_DEFAULT_X86 }}
+          schedulers: [ "slurm" ]
