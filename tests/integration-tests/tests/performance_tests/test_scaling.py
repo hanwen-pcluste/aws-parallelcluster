@@ -1,14 +1,15 @@
 import logging
+import time
 
 import pytest
 from remote_command_executor import RemoteCommandExecutor
 
-from tests.common.assertions import assert_no_msg_in_logs
+from tests.common.assertions import assert_no_msg_in_logs, wait_for_num_instances_in_cluster
 
 
 @pytest.mark.parametrize(
     "max_nodes",
-    [1000],
+    [2000],
 )
 def test_scaling(
     vpc_stack,
@@ -29,24 +30,31 @@ def test_scaling(
 
     remote_command_executor = RemoteCommandExecutor(cluster)
     scheduler_commands = scheduler_commands_factory(remote_command_executor)
+    for i in range(10):
+        logging.info(f"iterationnnnnnn: {i}")
+        logging.info(f"Submitting an array of {max_nodes} jobs on {max_nodes} nodes")
+        job_id = scheduler_commands.submit_command_and_assert_job_accepted(
+            submit_command_args={
+                "command": "srun sleep 10",
+                "partition": "queue-0",
+                "nodes": max_nodes,
+                "slots": max_nodes,
+            }
+        )
 
-    logging.info(f"Submitting an array of {max_nodes} jobs on {max_nodes} nodes")
-    job_id = scheduler_commands.submit_command_and_assert_job_accepted(
-        submit_command_args={
-            "command": "srun sleep 10",
-            "partition": "queue-0",
-            "nodes": max_nodes,
-            "slots": max_nodes,
-        }
-    )
+        logging.info(f"Waiting for job to be running: {job_id}")
+        scheduler_commands.wait_job_running(job_id)
+        logging.info(f"Job {job_id} is running")
 
-    logging.info(f"Waiting for job to be running: {job_id}")
-    scheduler_commands.wait_job_running(job_id)
-    logging.info(f"Job {job_id} is running")
+        logging.info(f"Cancelling job: {job_id}")
+        scheduler_commands.cancel_job(job_id)
+        logging.info(f"Job {job_id} cancelled")
 
-    logging.info(f"Cancelling job: {job_id}")
-    scheduler_commands.cancel_job(job_id)
-    logging.info(f"Job {job_id} cancelled")
+        cluster.stop()
+        wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=0)
+        time.sleep(30)
+        cluster.start()
+        time.sleep(60)
 
     logging.info("Verifying no bootstrap errors in logs")
     assert_no_msg_in_logs(

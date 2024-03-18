@@ -2,7 +2,7 @@ Region: {{ region }}
 Image:
   Os: {{ os }}
 HeadNode:
-  InstanceType: c5.24xlarge
+  InstanceType: c5n.18xlarge
   Networking:
     SubnetId: {{ public_subnet_id }}
   Ssh:
