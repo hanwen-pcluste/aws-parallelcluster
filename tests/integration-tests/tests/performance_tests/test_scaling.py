@@ -1,3 +1,4 @@
+import datetime
 import logging
 import time
 
@@ -33,6 +34,7 @@ def test_scaling(
     for i in range(10):
         logging.info(f"iterationnnnnnn: {i}")
         logging.info(f"Submitting an array of {max_nodes} jobs on {max_nodes} nodes")
+        before_time = datetime.datetime.now()
         job_id = scheduler_commands.submit_command_and_assert_job_accepted(
             submit_command_args={
                 "command": "srun sleep 10",
@@ -44,6 +46,8 @@ def test_scaling(
 
         logging.info(f"Waiting for job to be running: {job_id}")
         scheduler_commands.wait_job_running(job_id)
+        after_time = datetime.datetime.now()
+        logging.info(f"Job starting time: {after_time - before_time}")
         logging.info(f"Job {job_id} is running")
 
         logging.info(f"Cancelling job: {job_id}")
@@ -54,7 +58,7 @@ def test_scaling(
         wait_for_num_instances_in_cluster(cluster.cfn_name, cluster.region, desired=0)
         time.sleep(30)
         cluster.start()
-        time.sleep(60)
+        time.sleep(400)
 
     logging.info("Verifying no bootstrap errors in logs")
     assert_no_msg_in_logs(
