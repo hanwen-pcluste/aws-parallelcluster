@@ -186,8 +186,9 @@ def slurm_dbd(request, database, region, os, vpc_stack_for_database, munge_key):
         _, munge_key_secret_arn = munge_key
 
         with open(slurm_dbd_stack_template_path) as slurmdbd_template:
+            custom_ami = request.config.getoption("custom_ami")
             stack_parameters = [
-                {"ParameterKey": "AmiId", "ParameterValue": retrieve_latest_ami(region, os, ami_type="pcluster")},
+                {"ParameterKey": "AmiId", "ParameterValue": custom_ami if custom_ami else retrieve_latest_ami(region, os, ami_type="pcluster")},
                 {"ParameterKey": "DBMSClientSG", "ParameterValue": database.cfn_outputs["DatabaseClientSecurityGroup"]},
                 {"ParameterKey": "DBMSDatabaseName", "ParameterValue": "slurm_database"},
                 {"ParameterKey": "DBMSPasswordSecretArn", "ParameterValue": database.cfn_outputs["DatabaseSecretArn"]},
