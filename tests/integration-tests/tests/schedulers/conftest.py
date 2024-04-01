@@ -34,13 +34,13 @@ def vpc_stack_for_database(region, request):
 
     def _create_stack(request, template, region, default_az_id, az_ids, stack_factory):
         stack = CfnVpcStack(
-            name=generate_stack_name("integ-tests-vpc-database", request.config.getoption("stackname_suffix")),
+            name="integ-tests-vpc-database-vqkxy4pjr36bk52o",
             region=region,
             template=template.to_json(),
             default_az_id=default_az_id,
             az_ids=az_ids,
         )
-        stack_factory.create_stack(stack)
+        # stack_factory.create_stack(stack)
         return stack
 
     # tests with database are not using multi-AZ
@@ -178,7 +178,7 @@ def slurm_dbd(request, database, region, os, vpc_stack_for_database, munge_key):
 
         slurm_dbd_stack_template_path = "../../cloudformation/external-slurmdbd/external-slurmdbd.json"
         logging.info("Creating stack %s", slurm_dbd_stack_name)
-        subnet_id = vpc_stack_for_database.get_public_subnet()
+        subnet_id = vpc_stack_for_database.cfn_outputs["Aps1Az1PublicSubnetId"]
         subnet = boto3.client("ec2", region_name=region).describe_subnets(SubnetIds=[subnet_id])["Subnets"][0]
         vpc_id = subnet["VpcId"]
         ipaddresses = ipaddress.IPv4Network(subnet["CidrBlock"])
@@ -201,6 +201,7 @@ def slurm_dbd(request, database, region, os, vpc_stack_for_database, munge_key):
                 {"ParameterKey": "SubnetId", "ParameterValue": subnet_id},
                 {"ParameterKey": "SlurmdbdPort", "ParameterValue": "6819"},
                 {"ParameterKey": "VPCId", "ParameterValue": vpc_id},
+                {"ParameterKey": "CustomCookbookUrl", "ParameterValue": "https://github.com/hanwen-pcluste/aws-parallelcluster-cookbook/tarball/wip/feature/external_slurmdbd_testing"},
             ]
             slurm_dbd_stack = CfnStack(
                 name=slurm_dbd_stack_name,

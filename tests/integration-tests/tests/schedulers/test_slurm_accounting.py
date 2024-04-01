@@ -211,8 +211,8 @@ def test_slurm_accounting_external_dbd(
 ):
 
     config_params = _get_slurm_dbd_config_parameters(slurm_dbd.cfn_outputs)
-    public_subnet_id = vpc_stack_for_database.get_public_subnet()
-    private_subnet_id = vpc_stack_for_database.get_private_subnet()
+    public_subnet_id = vpc_stack_for_database.cfn_outputs["Aps1Az1PublicSubnetId"]
+    private_subnet_id = vpc_stack_for_database.cfn_outputs["Aps1Az1PrivateSubnetId"]
     _, munge_key_secret_arn = munge_key
     cluster_config = pcluster_config_reader(
         public_subnet_id=public_subnet_id,
