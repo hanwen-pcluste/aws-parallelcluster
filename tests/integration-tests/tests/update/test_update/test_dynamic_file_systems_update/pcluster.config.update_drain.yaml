@@ -8,7 +8,7 @@ HeadNode:
     KeyName: {{ key_name }}
   Iam:
     S3Access:
-      - BucketName: {{ bucket_name }}
+      - BucketName: "*"
 Scheduling:
   SlurmSettings:
     QueueUpdateStrategy: DRAIN
