@@ -21,7 +21,7 @@ from utils import get_username_for_os, wait_for_computefleet_changed
 
 from tests.common.assertions import (
     assert_aws_identity_access_is_correct,
-    assert_cluster_imds_v2_requirement_status,
+    assert_cluster_imds_requirement_status,
     assert_default_user_has_desired_sudo_access,
     assert_head_node_is_running,
     assert_lines_in_logs,
@@ -110,14 +110,14 @@ def test_create_imds_secured(
     logging.info("Checking cluster access after cluster creation")
     assert_head_node_is_running(region, cluster)
     assert_aws_identity_access_is_correct(cluster, users_allow_list)
-    assert_cluster_imds_v2_requirement_status(region, cluster, status)
+    assert_cluster_imds_requirement_status(region, cluster, status)
 
     reboot_head_node(cluster)
 
     logging.info("Checking cluster access after head node reboot")
     assert_head_node_is_running(region, cluster)
     assert_aws_identity_access_is_correct(cluster, users_allow_list)
-    assert_cluster_imds_v2_requirement_status(region, cluster, status)
+    assert_cluster_imds_requirement_status(region, cluster, status)
 
 
 @pytest.mark.usefixtures("instance", "scheduler")
@@ -128,6 +128,7 @@ def test_create_disable_sudo_access_for_default_user(
     Verify that the cluster removes the Sudo access for default user
     in all the nodes of the Cluster if the DisableSudoAccessForDefaultUser is enabled.
     """
+    status = "optional"
     login_nodes_count = 1
     disable_sudo_access_default_user = False
     cluster_config = pcluster_config_reader(
@@ -141,6 +142,7 @@ def test_create_disable_sudo_access_for_default_user(
     for node_type in NodeType:
         assert_default_user_has_desired_sudo_access(cluster, node_type, region, disable_sudo_access_default_user)
 
+    assert_cluster_imds_requirement_status(region, cluster, status, version="IMDSv1")
     logging.info("Updating Cluster to enable sudo access")
     # Compute fleet shutdown
     cluster.stop()
@@ -173,6 +175,7 @@ def test_create_disable_sudo_access_for_default_user(
     logging.info("Checking default user's sudo access after cluster Update")
     for node_type in NodeType:
         assert_default_user_has_desired_sudo_access(cluster, node_type, region, disable_sudo_access_default_user)
+    assert_cluster_imds_requirement_status(region, cluster, status, version="IMDSv1")
 
 
 @pytest.mark.usefixtures("instance", "os", "scheduler")

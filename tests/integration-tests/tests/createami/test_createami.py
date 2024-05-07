@@ -31,7 +31,7 @@ from utils import generate_stack_name, get_arn_partition
 
 from tests.common.assertions import (
     assert_head_node_is_running,
-    assert_instance_has_desired_imds_v2_setting,
+    assert_instance_has_desired_imds_setting,
     assert_instance_has_desired_tags,
     assert_lambda_vpc_settings_are_correct,
     assert_no_msg_in_logs,
@@ -499,7 +499,7 @@ def _test_build_imds_settings(image, status, region):
 
     for reservations in describe_response.get("Reservations"):
         for instance in reservations.get("Instances"):
-            assert_instance_has_desired_imds_v2_setting(instance, status)
+            assert_instance_has_desired_imds_setting(instance, status)
 
 
 def _test_build_instances_tags(image, build_tags, region):

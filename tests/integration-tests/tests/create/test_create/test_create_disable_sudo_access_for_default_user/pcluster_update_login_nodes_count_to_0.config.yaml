@@ -1,3 +1,5 @@
+Imds:
+  ImdsSupport: v1.0
 Image:
   Os: {{ os }}
 LoginNodes:

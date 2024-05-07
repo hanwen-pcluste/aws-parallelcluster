@@ -224,8 +224,8 @@ def assert_head_node_is_running(region, cluster):
     assert_that(head_node_state).is_equal_to("running")
 
 
-def assert_cluster_imds_v2_requirement_status(region, cluster, status):
-    logging.info(f"Checking that all the nodes in the cluster have IMDSv2 {status}")
+def assert_cluster_imds_requirement_status(region, cluster, status, version="IMDSv2"):
+    logging.info(f"Checking that all the nodes in the cluster have {version} {status}")
 
     describe_response = boto3.client("ec2", region_name=region).describe_instances(
         Filters=[
@@ -235,18 +235,18 @@ def assert_cluster_imds_v2_requirement_status(region, cluster, status):
 
     for reservations in describe_response.get("Reservations"):
         for instance in reservations.get("Instances"):
-            assert_instance_has_desired_imds_v2_setting(instance, status)
+            assert_instance_has_desired_imds_setting(instance, status, version)
 
 
-def assert_instance_has_desired_imds_v2_setting(instance, status):
+def assert_instance_has_desired_imds_setting(instance, status, version="IMDSv2"):
     instance_id = instance.get("InstanceId")
     instance_name = [tag["Value"] for tag in instance.get("Tags") if tag["Key"] == "Name"]
     instance_name_part = f" ({instance_name[0]})" if instance_name else ""
-    imds_v2_status = instance.get("MetadataOptions").get("HttpTokens")
+    imds_status = instance.get("MetadataOptions").get("HttpTokens")
 
-    logging.info(f"Instance {instance_id}{instance_name_part} has IMDSv2 {imds_v2_status}")
+    logging.info(f"Instance {instance_id}{instance_name_part} has {version} {imds_status}")
 
-    assert_that(imds_v2_status).is_equal_to(status)
+    assert_that(imds_status).is_equal_to(status)
 
 
 def assert_instance_has_desired_tags(instance, tags: List[dict]):
