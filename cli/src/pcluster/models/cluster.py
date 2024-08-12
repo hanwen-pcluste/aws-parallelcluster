@@ -757,6 +757,7 @@ class Cluster:
     def has_running_login_nodes(self, updated_value: bool = False, pool_name: str = None) -> bool:
         """
         Return True if the cluster has running login nodes, or a specific pool if a pool name is provided.
+
         Note: the value will be cached.
         """
         if pool_name:

@@ -170,7 +170,7 @@ def test_login_node_security_groups(
     region, custom_security_groups, pcluster_config_reader, clusters_factory, assign_additional_security_groups
 ):
     """
-    Test login node and network load balancer of share the same SecurityGroups, AdditionalSecurityGroups, and SSH
+    Test login node and network load balancer share the same SecurityGroups, AdditionalSecurityGroups, and SSH
     restrictions when defined in the config.
 
     Test that the network load balancer managed security group is referenced in an inbound rule of the
