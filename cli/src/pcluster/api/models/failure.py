@@ -1,12 +1,12 @@
 # coding: utf-8
 
 from __future__ import absolute_import
-
 from datetime import date, datetime  # noqa: F401
-from typing import Dict, List  # noqa: F401
 
-from pcluster.api import util
+from typing import List, Dict  # noqa: F401
+
 from pcluster.api.models.base_model_ import Model
+from pcluster.api import util
 
 
 class Failure(Model):
@@ -23,15 +23,21 @@ class Failure(Model):
         :param failure_reason: The failure_reason of this Failure.  # noqa: E501
         :type failure_reason: str
         """
-        self.openapi_types = {"failure_code": str, "failure_reason": str}
+        self.openapi_types = {
+            'failure_code': str,
+            'failure_reason': str
+        }
 
-        self.attribute_map = {"failure_code": "failureCode", "failure_reason": "failureReason"}
+        self.attribute_map = {
+            'failure_code': 'failureCode',
+            'failure_reason': 'failureReason'
+        }
 
         self._failure_code = failure_code
         self._failure_reason = failure_reason
 
     @classmethod
-    def from_dict(cls, dikt) -> "Failure":
+    def from_dict(cls, dikt) -> 'Failure':
         """Returns the dict as a model
 
         :param dikt: A dict.
