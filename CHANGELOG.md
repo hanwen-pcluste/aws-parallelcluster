@@ -190,7 +190,7 @@ CHANGELOG
 - Fix inconsistent scaling configuration after cluster update rollback when modifying the list of instance types declared in the Compute Resources.
 - Fix users SSH keys generation when switching users without root privilege in clusters integrated with an external LDAP server through cluster configuration files.
 - Fix disabling Slurm power save mode when setting `ScaledownIdletime = -1`.
-- Fix hard-coded path to Slurm installation dir in `update_slurm_database_password.sh` script for Slurm Accounting.
+- Fix hard-coded spath to Slurm installation dir in `update_slurm_database_password.sh` script for Slurm Accounting.
 
 3.7.2
 ------
