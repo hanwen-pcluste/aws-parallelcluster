@@ -28,7 +28,7 @@ Scheduling:
           {% endfor %}
     - Name: queue-1
       ComputeResources:
-        - Name: queue-1-compute-resource-0
+        - Name: compute-resource-2
           Instances:
             - InstanceType: {{ instance }}
           MaxCount: {{ max_cluster_size }}
@@ -39,7 +39,7 @@ Scheduling:
           {% endfor %}
     - Name: queue-2
       ComputeResources:
-        - Name: queue-2-compute-resource-0
+        - Name: compute-resource-2
           Instances:
             - InstanceType: {{ instance }}
           MaxCount: {{ max_cluster_size }}
