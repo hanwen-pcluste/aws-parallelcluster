@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-3.11.0
+3.8.0
 ------
 
 **ENHANCEMENTS**
