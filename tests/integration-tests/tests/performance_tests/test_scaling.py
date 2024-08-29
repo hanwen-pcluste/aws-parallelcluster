@@ -158,7 +158,7 @@ def test_scaling_stress_test(
             # ref https://docs.aws.amazon.com/AWSEC2/latest/APIReference/throttling.html
             if scaling_target != scaling_targets[-1]:
                 logging.info("Waiting for the RunInstances Resource Token Bucket to refill")
-                time.sleep(300)
+                time.sleep(500)
 
 
 @pytest.mark.usefixtures("scheduler")
