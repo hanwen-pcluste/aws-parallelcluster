@@ -125,9 +125,9 @@ def test_build_image(
     # Get base AMI
     # remarkable AMIs are not available for ARM and ubuntu2204 yet
     if os not in ["ubuntu2204", "alinux2023"]:
-        base_ami = retrieve_latest_ami(region, os, ami_type="remarkable", architecture=architecture)
+        base_ami = retrieve_latest_ami(region, os, ami_type="first_stage", architecture=architecture)
     else:
-        base_ami = retrieve_latest_ami(region, os, architecture=architecture)
+        base_ami = retrieve_latest_ami(region, os, ami_type="first_stage", architecture=architecture)
 
     image_config = pcluster_config_reader(
         config_file="image.config.yaml", parent_image=base_ami, instance_role=instance_role, bucket_name=bucket_name

@@ -89,11 +89,23 @@ OS_TO_PCLUSTER_AMI_NAME_OWNER_MAP = {
     "rocky9": {"name": "rocky9-hvm-*-*", "owners": PCLUSTER_AMI_OWNERS},
 }
 
+OS_TO_FIRST_STAGE_AMI_NAME_MAP = {
+    "alinux2": {"name": "first-stage-aws-parallelcluster-*-amzn2-*"},
+    "alinux2023": {"name": "first-stage-aws-parallelcluster-*-amzn2023-*"},
+    "ubuntu2004": {"name": "first-stage-aws-parallelcluster-*-ubuntu-2004-*"},
+    "ubuntu2204": {"name": "first-stage-aws-parallelcluster-*-ubuntu-2204-*"},
+    "rhel8": {"name": "first-stage-aws-parallelcluster-*-rhel8-*"},
+    "rocky8": {"name": "first-stage-aws-parallelcluster-*-rocky8-*"},
+    "rhel9": {"name": "first-stage-aws-parallelcluster-*-rhel9-*"},
+    "rocky9": {"name": "first-stage-aws-parallelcluster-*-rocky9-*"},
+}
+
 AMI_TYPE_DICT = {
     "official": OS_TO_OFFICIAL_AMI_NAME_OWNER_MAP,
     "remarkable": OS_TO_REMARKABLE_AMI_NAME_OWNER_MAP,
     "pcluster": OS_TO_PCLUSTER_AMI_NAME_OWNER_MAP,
     "kernel4": OS_TO_KERNEL4_AMI_NAME_OWNER_MAP,
+    "first_stage": OS_TO_FIRST_STAGE_AMI_NAME_MAP
 }
 
 
@@ -130,7 +142,7 @@ def retrieve_latest_ami(
         response = boto3.client("ec2", region_name=region).describe_images(
             Filters=[{"Name": "name", "Values": [ami_name]}, {"Name": "architecture", "Values": [architecture]}]
             + additional_filters,
-            Owners=_get_ami_for_os(ami_type, os).get("owners"),
+            Owners=_get_ami_for_os(ami_type, os).get("owners") or ["447714826191"],
             IncludeDeprecated=_get_ami_for_os(ami_type, os).get("includeDeprecated", False),
         )
         # Sort on Creation date Desc
