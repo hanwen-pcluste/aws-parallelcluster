@@ -137,14 +137,25 @@ class ConfigPatch:
                             )
             else:
                 # Simple param
-                target_value = target_section.get(data_key, None) if target_section else None
-                base_value = base_section.get(data_key, None) if base_section else None
+                target_value, data_key = self._get_value_from_section(data_key, target_section)
+                base_value, data_key = self._get_value_from_section(data_key, base_section)
 
                 if target_value != base_value:
                     # Add param change information
                     self.changes.append(
                         Change(param_path, data_key, base_value, target_value, change_update_policy, is_list=False)
                     )
+
+    def _get_value_from_section(self, data_key, target_section):
+        target_value = None
+        if target_section:
+            target_value = target_section.get(data_key, None)
+            if data_key == "Script" and target_value is None:
+                # This handles special case when multiple installation scripts are provided.
+                # The schema of script sequence is customized. The following code correctly detect changes.
+                target_value = target_section.get("Sequence", None)
+                data_key = "Sequence"
+        return target_value, data_key
 
     def _compare_nested_section(self, param_path, data_key, base_value, target_value, field_obj):
         # Compare nested sections and params
